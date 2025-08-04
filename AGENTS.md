@@ -1,177 +1,108 @@
-# AGENTS.md
+# AGENTS.md — Implementation Guide for Sui Move Smart‑Contracts
 
-## 🧠 Project Purpose
-
-This repository contains the smart contracts for **Inkray**, a decentralized publishing platform on the **Sui blockchain**. It gives creators control over content distribution, monetization, and access — while enabling readers to own and unlock content through NFTs or subscriptions.
-
-Smart contracts in this repo handle:
-
-- NFT minting for articles
-- Platform-level subscriptions
-- Gated access via Vaults + Seal conditions
-- Tips and payments
-- Event emission for off-chain logic & indexing
+_This file tells a Codex/Autonomous Agent how to generate, test, and publish the Move contracts that power the decentralized publishing platform described in **`Decentralized Publishing Architecture Plan`**._
 
 ---
 
-## 🔐 Content Access Model – Tip, Free, Paid, Subscribed
+## 0 Target Repo Layout
 
-Inkray supports four distinct content access scenarios. These determine how content files are stored (Vaults) and unlocked (Seal logic):
-
-### 1. **Tip a Creator**
-
-- One-time, optional payment
-- No content unlock is triggered
-- Purpose: Support the creator with no expectation of access
-
-✅ Smart Contract:
-
-- `tipping.move`
-
-✅ On-chain action:
-
-- Emits `TipSent` with `sender`, `receiver`, `amount`, `message`
-
----
-
-### 2. **Free Article**
-
-- No tip, NFT, or subscription required
-- Public Vault file
-- No Seal condition attached
-
-✅ Smart Contract:
-
-- None needed
-
-✅ Off-chain:
-
-- Article stored in Vault as **public file** (no encryption, no gating)
+```
+contracts/
+  Move.toml
+  sources/
+    storage_vault.move
+    publication_nft.move
+    publication_policy.move
+    tipping.move
+    subscription.move
+  tests/
+    storage_vault.test.ts
+    publication_nft.test.ts
+    seal_policy.test.ts
+scripts/
+  deploy.sh
+  publish_manifest.json
+README.md
+```
 
 ---
 
-### 3. **Paid Article – NFT Unlock**
+## 1 High‑level Requirements
 
-- User mints an **Article NFT**
-- Article is sealed to users who own the NFT
-- Access is permanent (NFT = forever access)
-
-✅ Smart Contract:
-
-- `article_nft.move`
-
-✅ Seal Condition:
-
-- `owns_nft(0x...::article_nft::ArticleNFT, article_id)`
-
-✅ On-chain:
-
-- Emits `NFTMinted` with `minter`, `article_id`, `vault_id`
-
----
-
-### 4. **Paid Article – Subscription Unlock**
-
-- User subscribes to the platform
-- Access all gated content for a set duration (e.g., 30 days)
-- After expiry, access is revoked unless renewed
-
-✅ Smart Contract:
-
-- `subscription.move`
-
-✅ Seal Condition:
-
-- `has_active_subscription(user_address, timestamp)`
-
-✅ On-chain:
-
-- Emits `SubscriptionStarted`, `SubscriptionRenewed`, `SubscriptionExpired`
+1. **StorageVault** (`storage_vault.move`)
+   - Aggregate Walrus `StorageResource` IDs.
+   - Allow only the vault owner to deposit blobs.
+   - `extend()` callable by addresses that hold a platform‑granted `RenewCap`.
+2. **Publication‑Access NFT** (`publication_nft.move`)
+   - ERC‑721‑style NFT (implements Sui Transfer traits automatically).
+   - Stores `vault_id` + `renew_cap_id` so that ownership of the NFT ≡ ownership of vault.
+3. **Seal Policy** (`publication_policy.move`)
+   - Implements `seal::policy::Policy` trait.
+   - Authorize if `object::owner(nft_id)==caller`.
+4. **Tipping & Subscription** modules (Phase‑2 but stub now).
+   - Simple `pay<SUI>` to creator.
+   - Subscription NFT mint & validity check.
+5. **Unit tests** in TypeScript (Sui TS SDK + Mocha) exercising:
+   - Vault creation, deposit, extend with and without renew cap.
+   - NFT mint, transfer, automatic vault ownership change.
+   - Seal policy returning `true/false` for owner vs non‑owner.
 
 ---
 
-## 🗃️ Vault + Seal Overview
+## 2 Coding Standards
 
-### Vault
-
-- Each creator has their own Walrus Vault (object stored on-chain)
-- Every article links to one or more files inside the Vault
-- Gated content is encrypted; public content is open
-
-### Seal
-
-- Walrus enforces file access based on on-chain conditions
-- Seal conditions are:
-  - Referenced by file metadata
-  - Based on NFT ownership or active subscriptions
-- Conditions are verified cryptographically and never leak user identity
-
-✅ Codex Tip:
-Emit meaningful events so that Walrus can derive Seal access from on-chain logs. Structure event fields carefully.
+- Use `sui::object`, `sui::transfer`, `sui::coin` idioms.
+- Comment every public function with Move‑doc.
+- Abort codes: use low integers (0‑10) per invariant; document them in a section at top of file.
+- Max line length 100 chars.
+- Feature‑gate `test` code with `#[test_only]`.
 
 ---
 
-## 📦 Modules Overview
+## 3 Build & Test Pipeline
 
-| Module                | Purpose                                            |
-| --------------------- | -------------------------------------------------- |
-| `article_nft.move`    | Mint NFTs that grant access to individual articles |
-| `subscription.move`   | Manage platform-wide subscriptions with expiry     |
-| `tipping.move`        | One-time payments to creators (no access tied)     |
-| `vault_registry.move` | Track creator Vaults and register articles         |
-| `events.move`         | Common events for indexing and Seal integration    |
+1. `npm i` (installs `@mysten/sui.js` and `@mysten/mocha` helpers).
+2. `cargo run -p sui-move build` (or `sui move build`).
+3. `npm test` — runs Mocha tests that spin up a local Sui network via `sui-test-validator`.
+4. `./scripts/deploy.sh` publishes the bundle to a specified network; outputs object IDs to `publish_manifest.json`.
 
 ---
 
-## 🛠️ Codex Agent Responsibilities
+## 4 Detailed Task List for Codex Agent
 
-You should:
-
-- Implement logic to handle all 4 access scenarios above
-- Emit standardized events for each action (`TipSent`, `NFTMinted`, `SubscriptionStarted`, etc.)
-- Ensure NFT and subscription types are **unique and queryable**
-- Help construct dynamic Seal conditions off-chain (via event data)
-
-Use the `sui` CLI to:
-
-- Compile: `sui move build`
-- Test: `sui move test`
-- Publish: `sui client publish`
-- Simulate tx: `sui client call`
+| ID  | Description                                                                                                     | File                              | Acceptance                                               |
+| --- | --------------------------------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------------------- |
+| A1  | Scaffold **Move.toml** with package name `dewrite_contracts`, addr aliases `storage_vault`, `pub_nft`, `policy` | `Move.toml`                       | `sui move build` succeeds                                |
+| A2  | Implement **StorageVault** per spec §1                                                                          | `sources/storage_vault.move`      | Unit tests: create vault, deposit ID, extend w/ renewcap |
+| A3  | Implement **PublicationNFT** incl. `mint()` returning `(PubNFT, Vault, RenewCap)`                               | `sources/publication_nft.move`    | Transfer test: new owner owns vault resources            |
+| A4  | Implement **PublicationPolicy** implementing `seal::policy::Policy`                                             | `sources/publication_policy.move` | `is_authorized` positive for holder, negative otherwise  |
+| A5  | Write TypeScript tests `storage_vault.test.ts`                                                                  | `tests/`                          | Mocha green                                              |
+| A6  | Write TS tests `publication_nft.test.ts`                                                                        | `tests/`                          | Mocha green                                              |
+| A7  | Write TS tests `seal_policy.test.ts` using mock Seal call                                                       | `tests/`                          | Mocha green                                              |
+| A8  | Lint: run `move-analyzer` (if available)                                                                        | —                                 | No warnings                                              |
+| A9  | Update `deploy.sh` to read ENV `SUI_PRIVATE_KEY` and publish                                                    | `scripts/`                        | Deployed IDs logged                                      |
 
 ---
 
-## 🧪 Suggested Test Scenarios
+## 5 Testing Notes
 
-- ✅ Tip without any unlock
-- ✅ Read free article (no restrictions)
-- ✅ Mint article NFT → access gated content
-- ✅ Subscribe → read all paid content
-- ✅ Subscription expires → access revoked
-- ✅ Ownership of NFT is transferred → new owner gains access
+- Use `sui::test_scenario` macros for pure Move unit tests when logic is self‑contained.
+- For cross‑module flows (Vault+NFT), prefer JS integration tests hitting a local validator.
+- Mock Walrus `StorageResource` IDs as simple `0x1` addresses — logic only stores IDs.
 
 ---
 
-## 🧰 Supporting Tools
+## 6 Security Checklist
 
-- `sui` CLI
-- Walrus SDK (for Vault and Seal management)
-- Plausible (for basic analytics)
-- Stripe or Aggregator SDKs (for payments)
+- ***
 
----
+## 7 Delivery Definition of Done
 
-## 🧭 Future Additions
-
-- Time-limited NFTs
-- Group-based or tiered subscriptions
-- Access rules based on token holdings (e.g., SUI ≥ threshold)
-- Reward logic for top subscribers (airdrop module)
+1. All tasks A1‑A9 complete.
+2. `sui move test` + JS Mocha pass.
+3. CI pipeline builds & publishes to testnet.
+4. Docs generated (`move‑doc`) and committed.
 
 ---
 
-### Codex: Read this
-
-- Your main job is to **securely define access rights on-chain** that the Seal engine can enforce off-chain
-- Be modular, emit clear events, and don’t hardcode Vault logic — let the frontend/backend pass Vault IDs
-- Move carefully and test well
+> **Codex agent hint:** Implement logic incrementally, run `sui move test` after each module, keep diffs small and well‑commented.
