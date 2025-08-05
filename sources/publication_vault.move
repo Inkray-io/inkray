@@ -1,13 +1,10 @@
 module contracts::publication_vault {
-    use walrus::system::{Self};
     use sui::event;
     use contracts::publication as publication;
     use contracts::publication::Publication;
 
     // === Errors ===
     const ENotAuthorized: u64 = 0;
-    const ENoStorageReserved: u64 = 1;
-    const ERenewalNotNeeded: u64 = 2;
 
     // === Structs ===
     public struct PublicationVault has key, store {

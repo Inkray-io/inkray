@@ -5,9 +5,8 @@ module contracts::publication {
 
     // === Errors ===
     const ENotOwner: u64 = 0;
-    const ENotAuthorized: u64 = 1;
-    const EContributorNotFound: u64 = 2;
-    const EContributorAlreadyExists: u64 = 3;
+    const EContributorNotFound: u64 = 1;
+    const EContributorAlreadyExists: u64 = 2;
 
     // === Structs ===
     public struct Publication has key, store {

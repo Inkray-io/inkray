@@ -2,7 +2,7 @@ module contracts::article_nft {
     use contracts::content_registry::{Self, Article};
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use sui::display::{Self, Display};
+    use sui::display;
     use sui::package;
     use sui::event;
     use std::string::{Self, String};
