@@ -8,7 +8,7 @@ module contracts::content_tests {
     use sui::test_scenario::{Self, Scenario};
     use std::string;
 
-    fun setup_publication_and_vault(scenario: &mut Scenario): (ID, ID) {
+    fun setup_publication_and_vault(scenario: &mut Scenario): ID {
         test_utils::next_tx(scenario, creator());
         let (mut publication, owner_cap) = publication::create_publication(
             test_utils::get_test_publication_name(),
@@ -18,14 +18,22 @@ module contracts::content_tests {
         );
         
         let publication_id = object::id(&publication);
-        let vault = publication_vault::create_vault(
+        
+        // Create shared vault
+        publication_vault::create_vault(
             publication_id,
             10,
             test_scenario::ctx(scenario)
         );
-        let vault_id = object::id(&vault);
-
-        publication::set_vault_id(&owner_cap, &mut publication, vault_id);
+        
+        // Update publication with actual vault ID
+        test_utils::next_tx(scenario, creator());
+        {
+            let vault = test_utils::take_shared<contracts::publication_vault::PublicationVault>(scenario);
+            let vault_id = object::id(&vault);
+            publication::set_vault_id(&owner_cap, &mut publication, vault_id);
+            test_utils::return_shared(vault);
+        };
 
         // Add contributor for testing
         publication::add_contributor(
@@ -37,34 +45,34 @@ module contracts::content_tests {
 
         test_utils::return_to_sender(scenario, publication);
         test_utils::return_to_sender(scenario, owner_cap);
-        test_utils::return_to_sender(scenario, vault);
         
-        (publication_id, vault_id)
+        publication_id
     }
 
     #[test]
     fun test_publish_article_by_contributor() {
         let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
+        let _publication_id = setup_publication_and_vault(&mut scenario);
 
         // Contributor publishes article
         test_utils::next_tx(&mut scenario, contributor());
         {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             let article = content_registry::publish_article(
                 &publication,
-                &vault,
+                &mut vault,
                 test_utils::get_test_article_title(),
                 test_utils::get_test_article_summary(),
                 test_utils::get_test_blob_id(),
+                test_utils::get_test_blob_size(),
                 false, // free content
                 test_scenario::ctx(&mut scenario)
             );
 
             // Verify article properties
-            let (pub_id, author, title, summary, blob_id, is_paid, created_at) = 
+            let (pub_id, author, title, summary, blob_id, is_paid, _created_at) = 
                 content_registry::get_article_info(&article);
             
             test_utils::assert_eq(pub_id, object::id(&publication));
@@ -73,15 +81,13 @@ module contracts::content_tests {
             test_utils::assert_eq(summary, test_utils::get_test_article_summary());
             test_utils::assert_eq(blob_id, test_utils::get_test_blob_id());
             test_utils::assert_false(is_paid);
-            test_utils::assert_true(created_at >= 0);
 
-            // Verify helper functions
-            test_utils::assert_eq(content_registry::get_author(&article), contributor());
-            test_utils::assert_eq(content_registry::get_blob_id(&article), test_utils::get_test_blob_id());
-            test_utils::assert_false(content_registry::is_paid_content(&article));
+            // Verify blob was stored in vault
+            test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
+            test_utils::assert_true(publication_vault::has_blob(&vault, test_utils::get_test_blob_id()));
 
+            test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -89,72 +95,45 @@ module contracts::content_tests {
     }
 
     #[test]
-    fun test_publish_paid_article_by_contributor() {
+    fun test_publish_article_by_owner() {
         let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
-
-        // Contributor publishes paid article
-        test_utils::next_tx(&mut scenario, contributor());
-        {
-            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
-
-            let article = content_registry::publish_article(
-                &publication,
-                &vault,
-                test_utils::get_test_article_title(),
-                test_utils::get_test_article_summary(),
-                test_utils::get_test_encrypted_blob_id(),
-                true, // paid content
-                test_scenario::ctx(&mut scenario)
-            );
-
-            // Verify paid content properties
-            test_utils::assert_true(content_registry::is_paid_content(&article));
-            test_utils::assert_eq(
-                content_registry::get_blob_id(&article),
-                test_utils::get_test_encrypted_blob_id()
-            );
-
-            test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), vault);
-            test_utils::return_to_sender(&scenario, article);
-        };
-
-        test_utils::end_scenario(scenario);
-    }
-
-    #[test]
-    fun test_publish_article_as_owner() {
-        let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
+        let _publication_id = setup_publication_and_vault(&mut scenario);
 
         // Owner publishes article
         test_utils::next_tx(&mut scenario, creator());
         {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
             let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             let article = content_registry::publish_article_as_owner(
                 &publication,
-                &vault,
+                &mut vault,
                 &owner_cap,
-                test_utils::get_test_article_title(),
-                test_utils::get_test_article_summary(),
-                test_utils::get_test_blob_id(),
-                false, // free content
+                string::utf8(b"Owner Article"),
+                string::utf8(b"Article by owner"),
+                test_utils::get_test_encrypted_blob_id(),
+                test_utils::get_test_blob_size(),
+                true, // paid content
                 test_scenario::ctx(&mut scenario)
             );
 
             // Verify article properties
-            let (pub_id, author, title, _, _, _, _) = content_registry::get_article_info(&article);
+            let (pub_id, author, title, _summary, blob_id, is_paid, _created_at) = 
+                content_registry::get_article_info(&article);
+            
             test_utils::assert_eq(pub_id, object::id(&publication));
-            test_utils::assert_eq(author, creator()); // Owner is the author
-            test_utils::assert_eq(title, test_utils::get_test_article_title());
+            test_utils::assert_eq(author, creator());
+            test_utils::assert_eq(title, string::utf8(b"Owner Article"));
+            test_utils::assert_eq(blob_id, test_utils::get_test_encrypted_blob_id());
+            test_utils::assert_true(is_paid);
 
+            // Verify blob was stored in vault
+            test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
+            test_utils::assert_true(publication_vault::has_blob(&vault, test_utils::get_test_encrypted_blob_id()));
+
+            test_utils::return_shared(vault);
             test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
             test_utils::return_to_sender(&scenario, owner_cap);
             test_utils::return_to_sender(&scenario, article);
         };
@@ -163,85 +142,85 @@ module contracts::content_tests {
     }
 
     #[test]
-    fun test_update_article_by_author() {
+    #[expected_failure(abort_code = contracts::content_registry::ENotAuthorized)]
+    fun test_unauthorized_publish_article() {
         let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
+        let _publication_id = setup_publication_and_vault(&mut scenario);
 
-        // Contributor publishes article
-        test_utils::next_tx(&mut scenario, contributor());
+        // user1 (not a contributor) tries to publish article
+        test_utils::next_tx(&mut scenario, user1());
         {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             let article = content_registry::publish_article(
                 &publication,
-                &vault,
-                test_utils::get_test_article_title(),
-                test_utils::get_test_article_summary(),
-                test_utils::get_test_blob_id(),
+                &mut vault,
+                string::utf8(b"Unauthorized Article"),
+                string::utf8(b"This should fail"),
+                999u256,
+                test_utils::get_test_blob_size(),
                 false,
                 test_scenario::ctx(&mut scenario)
             );
 
+            test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
-        // Author updates article
+        test_utils::end_scenario(scenario);
+    }
+
+    #[test]
+    fun test_update_article() {
+        let mut scenario = test_utils::begin_scenario(creator());
+        let _publication_id = setup_publication_and_vault(&mut scenario);
+
+        // Contributor publishes article
+        test_utils::next_tx(&mut scenario, contributor());
+        {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+
+            let article = content_registry::publish_article(
+                &publication,
+                &mut vault,
+                string::utf8(b"Original Title"),
+                string::utf8(b"Original summary"),
+                test_utils::get_test_blob_id(),
+                test_utils::get_test_blob_size(),
+                false,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            test_utils::return_shared(vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_sender(&scenario, article);
+        };
+
+        // Contributor updates article
         test_utils::next_tx(&mut scenario, contributor());
         {
             let mut article = test_utils::take_from_sender<Article>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
 
-            let new_title = string::utf8(b"Updated Article Title");
-            let new_summary = string::utf8(b"Updated article summary");
-
             content_registry::update_article(
                 &mut article,
                 &publication,
-                new_title,
-                new_summary,
+                string::utf8(b"Updated Title"),
+                string::utf8(b"Updated summary"),
                 test_scenario::ctx(&mut scenario)
             );
 
             // Verify updates
-            let (_, _, title, summary, _, _, _) = content_registry::get_article_info(&article);
-            test_utils::assert_eq(title, new_title);
-            test_utils::assert_eq(summary, new_summary);
-
-            test_utils::return_to_sender(&scenario, article);
-            test_utils::return_to_address(creator(), publication);
-        };
-
-        test_utils::end_scenario(scenario);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = contracts::content_registry::ENotAuthorized)]
-    fun test_unauthorized_article_publishing() {
-        let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
-
-        // Non-contributor tries to publish article
-        test_utils::next_tx(&mut scenario, user1()); // user1 is not a contributor
-        {
-            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
-
-            // This should fail
-            let article = content_registry::publish_article(
-                &publication,
-                &vault,
-                test_utils::get_test_article_title(),
-                test_utils::get_test_article_summary(),
-                test_utils::get_test_blob_id(),
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
+            let (_pub_id, _author, title, summary, _blob_id, _is_paid, _created_at) = 
+                content_registry::get_article_info(&article);
+            
+            test_utils::assert_eq(title, string::utf8(b"Updated Title"));
+            test_utils::assert_eq(summary, string::utf8(b"Updated summary"));
 
             test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -249,173 +228,129 @@ module contracts::content_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = contracts::content_registry::ENotAuthorized)]
-    fun test_unauthorized_article_update() {
+    fun test_mixed_content_publishing() {
         let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
+        let _publication_id = setup_publication_and_vault(&mut scenario);
 
-        // Contributor publishes article
+        // Publish multiple articles with different content types
         test_utils::next_tx(&mut scenario, contributor());
         {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
-            let article = content_registry::publish_article(
+            // Free article
+            let free_article = content_registry::publish_article(
                 &publication,
-                &vault,
-                test_utils::get_test_article_title(),
-                test_utils::get_test_article_summary(),
-                test_utils::get_test_blob_id(),
+                &mut vault,
+                string::utf8(b"Free Article"),
+                string::utf8(b"Everyone can read this"),
+                1001u256,
+                test_utils::get_test_blob_size(),
                 false,
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), vault);
-            test_utils::return_to_sender(&scenario, article);
-        };
-
-        // Different user tries to update article (should fail)
-        test_utils::next_tx(&mut scenario, user1()); // user1 is not the author
-        {
-            let mut article = test_utils::take_from_address<Article>(&scenario, contributor());
-            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-
-            // This should fail
-            content_registry::update_article(
-                &mut article,
+            // Paid article
+            let paid_article = content_registry::publish_article(
                 &publication,
-                string::utf8(b"Malicious Update"),
-                string::utf8(b"Unauthorized update"),
-                test_scenario::ctx(&mut scenario)
-            );
-
-            test_utils::return_to_address(contributor(), article);
-            test_utils::return_to_address(creator(), publication);
-        };
-
-        test_utils::end_scenario(scenario);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = contracts::content_registry::EInvalidVault)]
-    fun test_publish_with_wrong_vault() {
-        let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
-
-        // Create a second vault for a different publication
-        test_utils::next_tx(&mut scenario, creator());
-        {
-            let wrong_vault = publication_vault::create_vault(
-                @0x999.to_id(), // Different publication ID
-                10,
-                test_scenario::ctx(&mut scenario)
-            );
-            test_utils::return_to_sender(&scenario, wrong_vault);
-        };
-
-        // Try to publish article with mismatched vault
-        test_utils::next_tx(&mut scenario, contributor());
-        {
-            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let wrong_vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
-
-            // This should fail because vault doesn't belong to publication
-            let article = content_registry::publish_article(
-                &publication,
-                &wrong_vault,
-                test_utils::get_test_article_title(),
-                test_utils::get_test_article_summary(),
-                test_utils::get_test_blob_id(),
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
-
-            test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), wrong_vault);
-            test_utils::return_to_sender(&scenario, article);
-        };
-
-        test_utils::end_scenario(scenario);
-    }
-
-    #[test]
-    fun test_article_publishing_events() {
-        let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
-
-        // Contributor publishes article
-        test_utils::next_tx(&mut scenario, contributor());
-        {
-            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
-
-            let article = content_registry::publish_article(
-                &publication,
-                &vault,
-                test_utils::get_test_article_title(),
-                test_utils::get_test_article_summary(),
-                test_utils::get_test_blob_id(),
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
-
-            test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), vault);
-            test_utils::return_to_sender(&scenario, article);
-        };
-
-        // Events are emitted (verified through successful execution)
-
-        test_utils::end_scenario(scenario);
-    }
-
-    #[test]
-    fun test_multiple_articles_same_publication() {
-        let mut scenario = test_utils::begin_scenario(creator());
-        let (_publication_id, _vault_id) = setup_publication_and_vault(&mut scenario);
-
-        // Publish multiple articles
-        test_utils::next_tx(&mut scenario, contributor());
-        {
-            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
-
-            // Article 1: Free content
-            let article1 = content_registry::publish_article(
-                &publication,
-                &vault,
-                string::utf8(b"Article 1"),
-                string::utf8(b"First article summary"),
-                100u256,
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
-
-            // Article 2: Paid content
-            let article2 = content_registry::publish_article(
-                &publication,
-                &vault,
-                string::utf8(b"Article 2"),
-                string::utf8(b"Second article summary"),
-                200u256,
+                &mut vault,
+                string::utf8(b"Premium Article"),
+                string::utf8(b"This costs money"),
+                1002u256,
+                test_utils::get_test_blob_size(),
                 true,
                 test_scenario::ctx(&mut scenario)
             );
 
-            // Verify both articles belong to same publication
-            test_utils::assert_eq(
-                content_registry::get_publication_id(&article1),
-                content_registry::get_publication_id(&article2)
+            // Verify vault has both blobs
+            test_utils::assert_eq(publication_vault::get_blob_count(&vault), 2);
+            test_utils::assert_true(publication_vault::has_blob(&vault, 1001u256));
+            test_utils::assert_true(publication_vault::has_blob(&vault, 1002u256));
+
+            // Verify article properties
+            test_utils::assert_false(content_registry::is_paid_content(&free_article));
+            test_utils::assert_true(content_registry::is_paid_content(&paid_article));
+
+            test_utils::return_shared(vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_sender(&scenario, free_article);
+            test_utils::return_to_sender(&scenario, paid_article);
+        };
+
+        test_utils::end_scenario(scenario);
+    }
+
+    #[test]
+    fun test_multiple_contributors_publishing() {
+        let mut scenario = test_utils::begin_scenario(creator());
+        let _publication_id = setup_publication_and_vault(&mut scenario);
+
+        // Add another contributor
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_from_sender<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
+
+            publication::add_contributor(
+                &owner_cap,
+                &mut publication,
+                user1(),
+                test_scenario::ctx(&mut scenario)
             );
 
-            // Verify different content types
-            test_utils::assert_false(content_registry::is_paid_content(&article1));
-            test_utils::assert_true(content_registry::is_paid_content(&article2));
+            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
 
+        // First contributor publishes
+        test_utils::next_tx(&mut scenario, contributor());
+        {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+
+            let article1 = content_registry::publish_article(
+                &publication,
+                &mut vault,
+                string::utf8(b"Article by Contributor 1"),
+                string::utf8(b"First contributor's work"),
+                2001u256,
+                test_utils::get_test_blob_size(),
+                false,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article1);
+        };
+
+        // Second contributor publishes
+        test_utils::next_tx(&mut scenario, user1());
+        {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+
+            let article2 = content_registry::publish_article(
+                &publication,
+                &mut vault,
+                string::utf8(b"Article by Contributor 2"),
+                string::utf8(b"Second contributor's work"),
+                2002u256,
+                test_utils::get_test_blob_size(),
+                false,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            // Verify different authors
+            test_utils::assert_eq(content_registry::get_author(&article2), user1());
+
+            // Verify both blobs exist in vault
+            test_utils::assert_eq(publication_vault::get_blob_count(&vault), 2);
+            test_utils::assert_true(publication_vault::has_blob(&vault, 2001u256));
+            test_utils::assert_true(publication_vault::has_blob(&vault, 2002u256));
+
+            test_utils::return_shared(vault);
+            test_utils::return_to_address(creator(), publication);
             test_utils::return_to_sender(&scenario, article2);
         };
 

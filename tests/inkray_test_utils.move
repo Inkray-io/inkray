@@ -53,6 +53,26 @@ module contracts::inkray_test_utils {
         987654321u256
     }
 
+    public fun get_test_encrypted_encoding_type(): u8 {
+        0u8 // Same as regular encoding type for Walrus
+    }
+
+    public fun get_test_blob_size(): u64 {
+        1024u64
+    }
+
+    public fun get_test_encoding_type(): u8 {
+        0u8 // RS erasure coding
+    }
+
+    public fun get_test_registered_epoch(): u32 {
+        0u32 // Current epoch
+    }
+
+    public fun is_test_blob_deletable(): bool {
+        false // Permanent storage
+    }
+
     // === Time Constants (in milliseconds) ===
     
     public fun one_day_ms(): u64 {
@@ -180,13 +200,12 @@ module contracts::inkray_test_utils {
                 test_scenario::ctx(scenario)
             );
 
-            // Create vault
-            let vault = publication_vault::create_vault(
+            // Create shared vault - now creates and shares automatically  
+            publication_vault::create_vault(
                 object::id(&publication),
                 10, // batch size
                 test_scenario::ctx(scenario)
             );
-            publication::set_vault_id(&owner_cap, &mut publication, object::id(&vault));
 
             // Add contributor
             publication::add_contributor(
@@ -198,7 +217,75 @@ module contracts::inkray_test_utils {
 
             return_to_sender(scenario, publication);
             return_to_sender(scenario, owner_cap);
-            return_to_sender(scenario, vault);
+        };
+    }
+
+    // === Walrus Blob Testing Helpers ===
+    
+    public fun create_test_blob_and_store(
+        scenario: &mut Scenario,
+        sender: address,
+        blob_id: u256,
+        is_encrypted: bool
+    ) {
+        use contracts::publication_vault;
+        
+        next_tx(scenario, sender);
+        {
+            let mut vault = take_shared<contracts::publication_vault::PublicationVault>(scenario);
+            let publication = take_from_sender<contracts::publication::Publication>(scenario);
+            
+            publication_vault::store_blob(
+                &mut vault,
+                &publication,
+                blob_id,
+                get_test_blob_size(),
+                get_test_encoding_type(),
+                get_test_registered_epoch(),
+                is_test_blob_deletable(),
+                is_encrypted,
+                test_scenario::ctx(scenario)
+            );
+            
+            return_shared(vault);
+            return_to_sender(scenario, publication);
+        };
+    }
+    
+    public fun create_multiple_test_blobs(
+        scenario: &mut Scenario,
+        sender: address,
+        count: u64
+    ) {
+        use contracts::publication_vault;
+        
+        next_tx(scenario, sender);
+        {
+            let mut vault = take_shared<contracts::publication_vault::PublicationVault>(scenario);
+            let publication = take_from_sender<contracts::publication::Publication>(scenario);
+            
+            let mut i = 0;
+            while (i < count) {
+                let blob_id = (1000u256 + (i as u256));
+                let is_encrypted = (i % 2 == 1); // Alternate between encrypted and unencrypted
+                
+                publication_vault::store_blob(
+                    &mut vault,
+                    &publication,
+                    blob_id,
+                    get_test_blob_size(),
+                    get_test_encoding_type(),
+                get_test_registered_epoch(),
+                is_test_blob_deletable(),
+                    is_encrypted,
+                    test_scenario::ctx(scenario)
+                );
+                
+                i = i + 1;
+            };
+            
+            return_shared(vault);
+            return_to_sender(scenario, publication);
         };
     }
 

@@ -41,11 +41,12 @@ module contracts::content_registry {
     // === Public Functions ===
     fun publish_article_internal(
         publication: &Publication,
-        vault: &PublicationVault,
+        vault: &mut PublicationVault,
         author: address,
         title: String,
         summary: String,
         blob_id: u256,
+        blob_size: u64,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -70,8 +71,19 @@ module contracts::content_registry {
             created_at,
         };
 
-        // Add blob reference to vault
-        publication_vault::add_blob(vault, publication, blob_id, is_paid, ctx);
+        // Store blob in vault with Walrus metadata
+        // Backend will have uploaded to Walrus and provides this data
+        publication_vault::store_blob(
+            vault, 
+            publication, 
+            blob_id, 
+            blob_size,
+            0u8, // encoding_type (RS erasure coding)
+            0u32, // registered_epoch (current epoch)
+            false, // is_deletable (permanent storage)
+            is_paid, // is_encrypted (our content classification)
+            ctx
+        );
 
         event::emit(ArticlePublished {
             article_id,
@@ -88,10 +100,11 @@ module contracts::content_registry {
 
     public fun publish_article(
         publication: &Publication,
-        vault: &PublicationVault,
+        vault: &mut PublicationVault,
         title: String,
         summary: String,
         blob_id: u256,
+        blob_size: u64,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -107,6 +120,7 @@ module contracts::content_registry {
             title,
             summary,
             blob_id,
+            blob_size,
             is_paid,
             ctx,
         )
@@ -114,11 +128,12 @@ module contracts::content_registry {
 
     public fun publish_article_as_owner(
         publication: &Publication,
-        vault: &PublicationVault,
+        vault: &mut PublicationVault,
         owner_cap: &PublicationOwnerCap,
         title: String,
         summary: String,
         blob_id: u256,
+        blob_size: u64,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -135,6 +150,7 @@ module contracts::content_registry {
             title,
             summary,
             blob_id,
+            blob_size,
             is_paid,
             ctx,
         )
