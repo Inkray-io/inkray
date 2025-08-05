@@ -1,6 +1,8 @@
 module contracts::publication_vault {
     use walrus::system::{Self};
     use sui::event;
+    use contracts::publication as publication;
+    use contracts::publication::Publication;
 
     // === Errors ===
     const ENotAuthorized: u64 = 0;
@@ -8,14 +10,14 @@ module contracts::publication_vault {
     const ERenewalNotNeeded: u64 = 2;
 
     // === Structs ===
-    public struct PublicationVault has key {
+    public struct PublicationVault has key, store {
         id: UID,
         publication_id: ID,
         next_renewal_epoch: u64,
         renewal_batch_size: u64,
     }
 
-    public struct RenewCap has key {
+    public struct RenewCap has key, store {
         id: UID,
     }
 
@@ -78,16 +80,25 @@ module contracts::publication_vault {
 
     public fun add_blob(
         vault: &PublicationVault,
+        publication: &Publication,
         blob_id: u256,
         is_encrypted: bool,
         ctx: &TxContext
     ) {
+        let author = tx_context::sender(ctx);
+        assert!(object::id(publication) == vault.publication_id, ENotAuthorized);
+        assert!(
+            publication::is_contributor(publication, author) ||
+            publication::is_owner(publication, author),
+            ENotAuthorized
+        );
+
         event::emit(BlobAdded {
             vault_id: object::id(vault),
             publication_id: vault.publication_id,
             blob_id,
             is_encrypted,
-            author: tx_context::sender(ctx),
+            author,
         });
     }
 

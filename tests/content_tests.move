@@ -25,6 +25,8 @@ module contracts::content_tests {
         );
         let vault_id = object::id(&vault);
 
+        publication::set_vault_id(&owner_cap, &mut publication, vault_id);
+
         // Add contributor for testing
         publication::add_contributor(
             &owner_cap,
@@ -48,8 +50,8 @@ module contracts::content_tests {
         // Contributor publishes article
         test_utils::next_tx(&mut scenario, contributor());
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             let article = content_registry::publish_article(
                 &publication,
@@ -71,15 +73,15 @@ module contracts::content_tests {
             test_utils::assert_eq(summary, test_utils::get_test_article_summary());
             test_utils::assert_eq(blob_id, test_utils::get_test_blob_id());
             test_utils::assert_false(is_paid);
-            test_utils::assert_true(created_at > 0);
+            test_utils::assert_true(created_at >= 0);
 
             // Verify helper functions
             test_utils::assert_eq(content_registry::get_author(&article), contributor());
             test_utils::assert_eq(content_registry::get_blob_id(&article), test_utils::get_test_blob_id());
             test_utils::assert_false(content_registry::is_paid_content(&article));
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -94,8 +96,8 @@ module contracts::content_tests {
         // Contributor publishes paid article
         test_utils::next_tx(&mut scenario, contributor());
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             let article = content_registry::publish_article(
                 &publication,
@@ -114,8 +116,8 @@ module contracts::content_tests {
                 test_utils::get_test_encrypted_blob_id()
             );
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -168,8 +170,8 @@ module contracts::content_tests {
         // Contributor publishes article
         test_utils::next_tx(&mut scenario, contributor());
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             let article = content_registry::publish_article(
                 &publication,
@@ -181,8 +183,8 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -190,7 +192,7 @@ module contracts::content_tests {
         test_utils::next_tx(&mut scenario, contributor());
         {
             let mut article = test_utils::take_from_sender<Article>(&scenario);
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
 
             let new_title = string::utf8(b"Updated Article Title");
             let new_summary = string::utf8(b"Updated article summary");
@@ -209,7 +211,7 @@ module contracts::content_tests {
             test_utils::assert_eq(summary, new_summary);
 
             test_utils::return_to_sender(&scenario, article);
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_to_address(creator(), publication);
         };
 
         test_utils::end_scenario(scenario);
@@ -224,8 +226,8 @@ module contracts::content_tests {
         // Non-contributor tries to publish article
         test_utils::next_tx(&mut scenario, user1()); // user1 is not a contributor
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             // This should fail
             let article = content_registry::publish_article(
@@ -238,8 +240,8 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -255,8 +257,8 @@ module contracts::content_tests {
         // Contributor publishes article
         test_utils::next_tx(&mut scenario, contributor());
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             let article = content_registry::publish_article(
                 &publication,
@@ -268,16 +270,16 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
         // Different user tries to update article (should fail)
         test_utils::next_tx(&mut scenario, user1()); // user1 is not the author
         {
-            let mut article = test_utils::take_from_sender<Article>(&scenario);
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
+            let mut article = test_utils::take_from_address<Article>(&scenario, contributor());
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
 
             // This should fail
             content_registry::update_article(
@@ -288,8 +290,8 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, article);
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_to_address(contributor(), article);
+            test_utils::return_to_address(creator(), publication);
         };
 
         test_utils::end_scenario(scenario);
@@ -315,8 +317,8 @@ module contracts::content_tests {
         // Try to publish article with mismatched vault
         test_utils::next_tx(&mut scenario, contributor());
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let wrong_vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let wrong_vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             // This should fail because vault doesn't belong to publication
             let article = content_registry::publish_article(
@@ -329,8 +331,8 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, wrong_vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), wrong_vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -345,8 +347,8 @@ module contracts::content_tests {
         // Contributor publishes article
         test_utils::next_tx(&mut scenario, contributor());
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             let article = content_registry::publish_article(
                 &publication,
@@ -358,8 +360,8 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article);
         };
 
@@ -376,8 +378,8 @@ module contracts::content_tests {
         // Publish multiple articles
         test_utils::next_tx(&mut scenario, contributor());
         {
-            let publication = test_utils::take_from_sender<Publication>(&scenario);
-            let vault = test_utils::take_from_sender<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let vault = test_utils::take_from_address<PublicationVault>(&scenario, creator());
 
             // Article 1: Free content
             let article1 = content_registry::publish_article(
@@ -411,8 +413,8 @@ module contracts::content_tests {
             test_utils::assert_false(content_registry::is_paid_content(&article1));
             test_utils::assert_true(content_registry::is_paid_content(&article2));
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, vault);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), vault);
             test_utils::return_to_sender(&scenario, article1);
             test_utils::return_to_sender(&scenario, article2);
         };

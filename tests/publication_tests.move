@@ -227,8 +227,8 @@ module contracts::publication_tests {
         // Try to add contributor as non-owner
         test_utils::next_tx(&mut scenario, user1()); // Different user
         {
-            let mut publication = test_utils::take_from_sender<Publication>(&scenario);
-            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
+            let mut publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let owner_cap = test_utils::take_from_address<PublicationOwnerCap>(&scenario, creator());
 
             // This should fail - user1 doesn't own a different publication
             let (mut wrong_publication, wrong_cap) = publication::create_publication(
@@ -246,8 +246,8 @@ module contracts::publication_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
-            test_utils::return_to_sender(&scenario, owner_cap);
+            test_utils::return_to_address(creator(), publication);
+            test_utils::return_to_address(creator(), owner_cap);
             test_utils::return_to_sender(&scenario, wrong_publication);
             test_utils::return_to_sender(&scenario, wrong_cap);
         };

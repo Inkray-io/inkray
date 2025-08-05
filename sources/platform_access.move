@@ -9,16 +9,21 @@ module contracts::platform_access {
     const ENotSubscriber: u64 = 1;
     const EInsufficientPayment: u64 = 2;
     const ENotOwner: u64 = 3;
+    const EIncorrectPayment: u64 = 4;
+
+    const ACTION_NONE: u8 = 0;
+    const ACTION_EXTEND: u8 = 1;
+    const ACTION_RENEW: u8 = 2;
 
     // === Structs ===
-    public struct PlatformSubscription has key {
+    public struct PlatformSubscription has key, store {
         id: UID,
         subscriber: address,
         expires_at: u64,
         tier: u8,
     }
 
-    public struct PlatformService has key {
+    public struct PlatformService has key, store {
         id: UID,
         monthly_fee: u64,
         time_to_live: u64,
@@ -74,13 +79,20 @@ module contracts::platform_access {
     // === Public Functions ===
     public fun subscribe_to_platform(
         service: &PlatformService,
-        payment: Coin<SUI>,
+        mut payment: Coin<SUI>,
         tier: u8,
         clock: &Clock,
         ctx: &mut TxContext
     ): PlatformSubscription {
-        let payment_amount = coin::value(&payment);
+        let mut payment_amount = coin::value(&payment);
         assert!(payment_amount >= service.monthly_fee, EInsufficientPayment);
+        if (payment_amount > service.monthly_fee) {
+            let refund = coin::split(&mut payment, payment_amount - service.monthly_fee, ctx);
+            transfer::public_transfer(refund, tx_context::sender(ctx));
+            payment_amount = service.monthly_fee;
+        } else {
+            assert!(payment_amount == service.monthly_fee, EIncorrectPayment);
+        };
 
         let subscriber = tx_context::sender(ctx);
         let current_time = clock::timestamp_ms(clock);
@@ -132,12 +144,19 @@ module contracts::platform_access {
     public fun extend_subscription(
         subscription: &mut PlatformSubscription,
         service: &PlatformService,
-        payment: Coin<SUI>,
+        mut payment: Coin<SUI>,
         clock: &Clock,
-        ctx: &TxContext
+        ctx: &mut TxContext
     ) {
-        let payment_amount = coin::value(&payment);
+        let mut payment_amount = coin::value(&payment);
         assert!(payment_amount >= service.monthly_fee, EInsufficientPayment);
+        if (payment_amount > service.monthly_fee) {
+            let refund = coin::split(&mut payment, payment_amount - service.monthly_fee, ctx);
+            transfer::public_transfer(refund, tx_context::sender(ctx));
+            payment_amount = service.monthly_fee;
+        } else {
+            assert!(payment_amount == service.monthly_fee, EIncorrectPayment);
+        };
         assert!(subscription.subscriber == tx_context::sender(ctx), ENotSubscriber);
         
         let current_time = clock::timestamp_ms(clock);
@@ -164,12 +183,19 @@ module contracts::platform_access {
     public fun renew_subscription(
         subscription: &mut PlatformSubscription,
         service: &PlatformService,
-        payment: Coin<SUI>,
+        mut payment: Coin<SUI>,
         clock: &Clock,
-        ctx: &TxContext
+        ctx: &mut TxContext
     ) {
-        let payment_amount = coin::value(&payment);
+        let mut payment_amount = coin::value(&payment);
         assert!(payment_amount >= service.monthly_fee, EInsufficientPayment);
+        if (payment_amount > service.monthly_fee) {
+            let refund = coin::split(&mut payment, payment_amount - service.monthly_fee, ctx);
+            transfer::public_transfer(refund, tx_context::sender(ctx));
+            payment_amount = service.monthly_fee;
+        } else {
+            assert!(payment_amount == service.monthly_fee, EIncorrectPayment);
+        };
         assert!(subscription.subscriber == tx_context::sender(ctx), ENotSubscriber);
         
         let current_time = clock::timestamp_ms(clock);
@@ -250,11 +276,11 @@ module contracts::platform_access {
     ): u8 {
         let current_time = clock::timestamp_ms(clock);
         if (current_time >= subscription.expires_at) {
-            2 // Should renew (expired)
+            ACTION_RENEW
         } else if (subscription.expires_at - current_time <= 7 * 24 * 60 * 60 * 1000) {
-            1 // Should extend (expires within 7 days)
+            ACTION_EXTEND
         } else {
-            0 // No action needed
+            ACTION_NONE
         }
     }
 }

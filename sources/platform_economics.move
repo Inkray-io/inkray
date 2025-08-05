@@ -14,7 +14,7 @@ module contracts::platform_economics {
     const ENoFundsAvailable: u64 = 3;
 
     // === Structs ===
-    public struct CreatorTreasury has key {
+    public struct CreatorTreasury has key, store {
         id: UID,
         publication_id: ID,
         balance: Balance<SUI>,
@@ -23,7 +23,7 @@ module contracts::platform_economics {
         total_earnings: u64,
     }
 
-    public struct PlatformTreasury has key {
+    public struct PlatformTreasury has key, store {
         id: UID,
         balance: Balance<SUI>,
         owner: address,

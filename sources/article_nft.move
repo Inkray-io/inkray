@@ -12,6 +12,7 @@ module contracts::article_nft {
     const EInsufficientPayment: u64 = 1;
     const ENotOwner: u64 = 2;
     const EInvalidRoyalty: u64 = 3;
+    const EInvalidFeePercent: u64 = 4;
 
     // === Structs ===
     public struct ArticleNFT has key, store {
@@ -25,7 +26,7 @@ module contracts::article_nft {
         royalty_percent: u8,
     }
 
-    public struct MintConfig has key {
+    public struct MintConfig has key, store {
         id: UID,
         base_price: u64,
         max_royalty: u8,
@@ -52,6 +53,14 @@ module contracts::article_nft {
         from: address,
         to: address,
         price: Option<u64>,
+    }
+
+    public struct MintConfigUpdated has copy, drop {
+        config_id: ID,
+        new_base_price: u64,
+        new_max_royalty: u8,
+        new_platform_fee_percent: u8,
+        updated_by: address,
     }
 
     // === Init Function ===
@@ -221,9 +230,19 @@ module contracts::article_nft {
         ctx: &TxContext
     ) {
         assert!(tx_context::sender(ctx) == config.treasury, ENotOwner);
-        
+        assert!(new_max_royalty <= 100, EInvalidRoyalty);
+        assert!(new_platform_fee_percent <= 100, EInvalidFeePercent);
+
         config.base_price = new_base_price;
         config.max_royalty = new_max_royalty;
         config.platform_fee_percent = new_platform_fee_percent;
+
+        event::emit(MintConfigUpdated {
+            config_id: object::id(config),
+            new_base_price,
+            new_max_royalty,
+            new_platform_fee_percent,
+            updated_by: tx_context::sender(ctx),
+        });
     }
 }

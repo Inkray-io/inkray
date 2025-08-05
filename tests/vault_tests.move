@@ -1,9 +1,12 @@
 #[test_only]
 module contracts::vault_tests {
     use contracts::publication_vault::{Self, PublicationVault, RenewCap};
+    use contracts::publication as publication;
+    use contracts::publication::{Publication, PublicationOwnerCap};
     use contracts::inkray_test_utils::{admin, creator, contributor, user1};
     use contracts::inkray_test_utils as test_utils;
     use sui::test_scenario::{Self, Scenario};
+    use std::string;
 
     #[test]
     fun test_create_vault() {
@@ -44,8 +47,16 @@ module contracts::vault_tests {
         // Create vault
         test_utils::next_tx(&mut scenario, creator());
         {
+            let (mut publication, owner_cap) = publication::create_publication(
+                string::utf8(b"VaultPub"),
+                string::utf8(b"desc"),
+                @0x0.to_id(),
+                test_scenario::ctx(&mut scenario)
+            );
+            publication::add_contributor(&owner_cap, &mut publication, creator(), test_scenario::ctx(&mut scenario));
+
             let vault = publication_vault::create_vault(
-                @0x1.to_id(),
+                object::id(&publication),
                 10,
                 test_scenario::ctx(&mut scenario)
             );
@@ -53,6 +64,7 @@ module contracts::vault_tests {
             // Add blob (free content)
             publication_vault::add_blob(
                 &vault,
+                &publication,
                 test_utils::get_test_blob_id(),
                 false, // not encrypted
                 test_scenario::ctx(&mut scenario)
@@ -61,11 +73,14 @@ module contracts::vault_tests {
             // Add encrypted blob (paid content)
             publication_vault::add_blob(
                 &vault,
+                &publication,
                 test_utils::get_test_encrypted_blob_id(),
                 true, // encrypted
                 test_scenario::ctx(&mut scenario)
             );
 
+            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_to_sender(&scenario, owner_cap);
             test_utils::return_to_sender(&scenario, vault);
         };
 
@@ -207,8 +222,16 @@ module contracts::vault_tests {
         // Test all vault events
         test_utils::next_tx(&mut scenario, admin()); // Use admin to access RenewCap
         {
+            let (mut publication, owner_cap) = publication::create_publication(
+                string::utf8(b"VaultEvents"),
+                string::utf8(b"desc"),
+                @0x0.to_id(),
+                test_scenario::ctx(&mut scenario)
+            );
+            publication::add_contributor(&owner_cap, &mut publication, admin(), test_scenario::ctx(&mut scenario));
+
             let mut vault = publication_vault::create_vault(
-                @0x1.to_id(),
+                object::id(&publication),
                 10,
                 test_scenario::ctx(&mut scenario)
             );
@@ -216,6 +239,7 @@ module contracts::vault_tests {
             // Add blob (triggers BlobAdded event)
             publication_vault::add_blob(
                 &vault,
+                &publication,
                 test_utils::get_test_blob_id(),
                 false,
                 test_scenario::ctx(&mut scenario)
@@ -230,6 +254,8 @@ module contracts::vault_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
+            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_to_sender(&scenario, owner_cap);
             test_utils::return_to_sender(&scenario, vault);
             test_utils::return_to_sender(&scenario, renew_cap);
         };
@@ -273,25 +299,35 @@ module contracts::vault_tests {
         // Create vault and simulate article publishing workflow
         test_utils::next_tx(&mut scenario, creator());
         {
+            let (mut publication, owner_cap) = publication::create_publication(
+                string::utf8(b"WorkflowPub"),
+                string::utf8(b"desc"),
+                @0x0.to_id(),
+                test_scenario::ctx(&mut scenario)
+            );
+            publication::add_contributor(&owner_cap, &mut publication, creator(), test_scenario::ctx(&mut scenario));
+
             let vault = publication_vault::create_vault(
-                @0x1.to_id(),
+                object::id(&publication),
                 10,
                 test_scenario::ctx(&mut scenario)
             );
 
             // Simulate publishing multiple articles with different content types
             // Article 1: Free content with image
-            publication_vault::add_blob(&vault, 100u256, false, test_scenario::ctx(&mut scenario)); // article
-            publication_vault::add_blob(&vault, 101u256, false, test_scenario::ctx(&mut scenario)); // image
+            publication_vault::add_blob(&vault, &publication, 100u256, false, test_scenario::ctx(&mut scenario)); // article
+            publication_vault::add_blob(&vault, &publication, 101u256, false, test_scenario::ctx(&mut scenario)); // image
 
             // Article 2: Paid content with video
-            publication_vault::add_blob(&vault, 200u256, true, test_scenario::ctx(&mut scenario));  // encrypted article
-            publication_vault::add_blob(&vault, 201u256, false, test_scenario::ctx(&mut scenario)); // public preview image
+            publication_vault::add_blob(&vault, &publication, 200u256, true, test_scenario::ctx(&mut scenario));  // encrypted article
+            publication_vault::add_blob(&vault, &publication, 201u256, false, test_scenario::ctx(&mut scenario)); // public preview image
 
             // Article 3: Mixed content
-            publication_vault::add_blob(&vault, 300u256, true, test_scenario::ctx(&mut scenario));  // encrypted premium
-            publication_vault::add_blob(&vault, 301u256, false, test_scenario::ctx(&mut scenario)); // free teaser
+            publication_vault::add_blob(&vault, &publication, 300u256, true, test_scenario::ctx(&mut scenario));  // encrypted premium
+            publication_vault::add_blob(&vault, &publication, 301u256, false, test_scenario::ctx(&mut scenario)); // free teaser
 
+            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_to_sender(&scenario, owner_cap);
             test_utils::return_to_sender(&scenario, vault);
         };
 

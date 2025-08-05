@@ -10,7 +10,7 @@ module contracts::content_registry {
     const EInvalidVault: u64 = 2;
 
     // === Structs ===
-    public struct Article has key {
+    public struct Article has key, store {
         id: UID,
         publication_id: ID,
         author: address,
@@ -39,24 +39,21 @@ module contracts::content_registry {
     }
 
     // === Public Functions ===
-    public fun publish_article(
+    fun publish_article_internal(
         publication: &Publication,
         vault: &PublicationVault,
+        author: address,
         title: String,
         summary: String,
         blob_id: u256,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
-        let author = tx_context::sender(ctx);
         let publication_id = object::id(publication);
         let vault_id = publication::get_vault_id(publication);
-        
+
         // Verify the vault matches the publication
         assert!(object::id(vault) == vault_id, EInvalidVault);
-        
-        // Verify author is a contributor
-        assert!(publication::is_contributor(publication, author), ENotAuthorized);
 
         let id = object::new(ctx);
         let article_id = object::uid_to_inner(&id);
@@ -74,7 +71,7 @@ module contracts::content_registry {
         };
 
         // Add blob reference to vault
-        publication_vault::add_blob(vault, blob_id, is_paid, ctx);
+        publication_vault::add_blob(vault, publication, blob_id, is_paid, ctx);
 
         event::emit(ArticlePublished {
             article_id,
@@ -89,6 +86,32 @@ module contracts::content_registry {
         article
     }
 
+    public fun publish_article(
+        publication: &Publication,
+        vault: &PublicationVault,
+        title: String,
+        summary: String,
+        blob_id: u256,
+        is_paid: bool,
+        ctx: &mut TxContext
+    ): Article {
+        let author = tx_context::sender(ctx);
+
+        // Verify author is a contributor
+        assert!(publication::is_contributor(publication, author), ENotAuthorized);
+
+        publish_article_internal(
+            publication,
+            vault,
+            author,
+            title,
+            summary,
+            blob_id,
+            is_paid,
+            ctx,
+        )
+    }
+
     public fun publish_article_as_owner(
         publication: &Publication,
         vault: &PublicationVault,
@@ -101,43 +124,20 @@ module contracts::content_registry {
     ): Article {
         let author = tx_context::sender(ctx);
         let publication_id = object::id(publication);
-        let vault_id = publication::get_vault_id(publication);
-        
+
         // Verify ownership
         assert!(publication::get_publication_id(owner_cap) == publication_id, ENotAuthorized);
-        
-        // Verify the vault matches the publication
-        assert!(object::id(vault) == vault_id, EInvalidVault);
 
-        let id = object::new(ctx);
-        let article_id = object::uid_to_inner(&id);
-        let created_at = tx_context::epoch_timestamp_ms(ctx);
-
-        let article = Article {
-            id,
-            publication_id,
+        publish_article_internal(
+            publication,
+            vault,
             author,
             title,
             summary,
             blob_id,
             is_paid,
-            created_at,
-        };
-
-        // Add blob reference to vault
-        publication_vault::add_blob(vault, blob_id, is_paid, ctx);
-
-        event::emit(ArticlePublished {
-            article_id,
-            publication_id,
-            author,
-            title: article.title,
-            blob_id,
-            is_paid,
-            created_at,
-        });
-
-        article
+            ctx,
+        )
     }
 
     public fun update_article(

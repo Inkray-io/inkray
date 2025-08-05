@@ -5,6 +5,7 @@ license = "MIT"
 authors = ["Inkray Team"]
 
 [dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.53.1" }
 Walrus = { git = "https://github.com/MystenLabs/walrus.git", rev = "main", subdir = "contracts/walrus" }
 
 [addresses]

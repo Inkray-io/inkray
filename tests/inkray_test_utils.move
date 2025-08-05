@@ -4,6 +4,7 @@ module contracts::inkray_test_utils {
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
     use sui::clock::{Self, Clock};
+    use sui::transfer;
     use std::string::{Self, String};
 
     // === Test Addresses ===
@@ -107,6 +108,10 @@ module contracts::inkray_test_utils {
     public fun take_from_sender<T: key>(scenario: &Scenario): T {
         test_scenario::take_from_sender<T>(scenario)
     }
+
+    public fun take_from_address<T: key>(scenario: &Scenario, addr: address): T {
+        test_scenario::take_from_address<T>(scenario, addr)
+    }
     
     public fun has_most_recent_for_sender<T: key>(scenario: &Scenario): bool {
         let sender = test_scenario::sender(scenario);
@@ -114,9 +119,12 @@ module contracts::inkray_test_utils {
         id_opt.is_some()
     }
 
-    public fun return_to_sender<T: key>(_scenario: &Scenario, obj: T) {
-        // Use test_utils::destroy instead of return_to_sender to avoid capability issues
-        sui::test_utils::destroy(obj);
+    public fun return_to_sender<T: key + store>(scenario: &Scenario, obj: T) {
+        transfer::public_transfer(obj, test_scenario::sender(scenario));
+    }
+
+    public fun return_to_address<T: key + store>(addr: address, obj: T) {
+        transfer::public_transfer(obj, addr);
     }
 
     // === Event Testing Helpers ===
@@ -171,13 +179,14 @@ module contracts::inkray_test_utils {
                 @0x1.to_id(), // placeholder vault_id
                 test_scenario::ctx(scenario)
             );
-            
+
             // Create vault
             let vault = publication_vault::create_vault(
                 object::id(&publication),
                 10, // batch size
                 test_scenario::ctx(scenario)
             );
+            publication::set_vault_id(&owner_cap, &mut publication, object::id(&vault));
 
             // Add contributor
             publication::add_contributor(
