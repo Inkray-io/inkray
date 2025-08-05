@@ -5,20 +5,20 @@ module contracts::publication {
 
     // === Errors ===
     const ENotOwner: u64 = 0;
-    const ENotAuthorized: u64 = 1;
-    const EContributorNotFound: u64 = 2;
-    const EContributorAlreadyExists: u64 = 3;
+    const EContributorNotFound: u64 = 1;
+    const EContributorAlreadyExists: u64 = 2;
 
     // === Structs ===
-    public struct Publication has key {
+    public struct Publication has key, store {
         id: UID,
         name: String,
         description: String,
+        owner: address,
         vault_id: ID,
         contributors: VecSet<address>,
     }
 
-    public struct PublicationOwnerCap has key {
+    public struct PublicationOwnerCap has key, store {
         id: UID,
         publication_id: ID,
     }
@@ -58,6 +58,7 @@ module contracts::publication {
             id,
             name,
             description,
+            owner,
             vault_id,
             contributors: vec_set::empty(),
         };
@@ -141,6 +142,19 @@ module contracts::publication {
 
     public fun get_vault_id(publication: &Publication): ID {
         publication.vault_id
+    }
+
+    public fun get_owner(publication: &Publication): address {
+        publication.owner
+    }
+
+    public fun is_owner(publication: &Publication, addr: address): bool {
+        publication.owner == addr
+    }
+
+    public fun set_vault_id(owner_cap: &PublicationOwnerCap, publication: &mut Publication, vault_id: ID) {
+        assert!(owner_cap.publication_id == object::id(publication), ENotOwner);
+        publication.vault_id = vault_id;
     }
 
     public fun get_publication_info(publication: &Publication): (String, String, ID) {
