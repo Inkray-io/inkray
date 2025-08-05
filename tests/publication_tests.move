@@ -1,9 +1,9 @@
 #[test_only]
 module contracts::publication_tests {
     use contracts::publication::{Self, Publication, PublicationOwnerCap};
-    use contracts::inkray_test_utils::{admin, creator, contributor, user1};
+    use contracts::inkray_test_utils::{creator, contributor, user1};
     use contracts::inkray_test_utils as test_utils;
-    use sui::test_scenario::{Self, Scenario};
+    use sui::test_scenario;
     use std::string;
 
     #[test]

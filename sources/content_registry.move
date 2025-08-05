@@ -3,6 +3,7 @@ module contracts::content_registry {
     use contracts::publication_vault::{Self, PublicationVault};
     use sui::event;
     use std::string::String;
+    use walrus::blob::Blob;
 
     // === Errors ===
     const ENotAuthorized: u64 = 0;
@@ -45,8 +46,7 @@ module contracts::content_registry {
         author: address,
         title: String,
         summary: String,
-        blob_id: u256,
-        blob_size: u64,
+        blob: Blob,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -56,6 +56,7 @@ module contracts::content_registry {
         // Verify the vault matches the publication
         assert!(object::id(vault) == vault_id, EInvalidVault);
 
+        let blob_id = blob.blob_id();
         let id = object::new(ctx);
         let article_id = object::uid_to_inner(&id);
         let created_at = tx_context::epoch_timestamp_ms(ctx);
@@ -71,17 +72,12 @@ module contracts::content_registry {
             created_at,
         };
 
-        // Store blob in vault with Walrus metadata
-        // Backend will have uploaded to Walrus and provides this data
+        // Store blob in vault
         publication_vault::store_blob(
             vault, 
             publication, 
-            blob_id, 
-            blob_size,
-            0u8, // encoding_type (RS erasure coding)
-            0u32, // registered_epoch (current epoch)
-            false, // is_deletable (permanent storage)
-            is_paid, // is_encrypted (our content classification)
+            blob,
+            is_paid, // is_encrypted matches is_paid
             ctx
         );
 
@@ -103,8 +99,7 @@ module contracts::content_registry {
         vault: &mut PublicationVault,
         title: String,
         summary: String,
-        blob_id: u256,
-        blob_size: u64,
+        blob: Blob,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -119,8 +114,7 @@ module contracts::content_registry {
             author,
             title,
             summary,
-            blob_id,
-            blob_size,
+            blob,
             is_paid,
             ctx,
         )
@@ -132,8 +126,7 @@ module contracts::content_registry {
         owner_cap: &PublicationOwnerCap,
         title: String,
         summary: String,
-        blob_id: u256,
-        blob_size: u64,
+        blob: Blob,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -149,8 +142,7 @@ module contracts::content_registry {
             author,
             title,
             summary,
-            blob_id,
-            blob_size,
+            blob,
             is_paid,
             ctx,
         )

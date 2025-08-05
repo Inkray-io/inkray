@@ -2,29 +2,18 @@ module contracts::publication_vault {
     use contracts::publication::{Self as publication, Publication};
     use sui::event;
     use sui::table::{Self, Table};
-    // use std::string::String; // Not needed currently
+    use walrus::blob::{Self, Blob};
     
     // === Errors ===
     const ENotAuthorized: u64 = 0;
     
     // === Structs ===
     
-    // Walrus-compatible blob structure containing all data from actual Walrus Blob objects
-    // This matches the fields available in walrus::system::blob::Blob
-    public struct WalrusBlob has store, drop {
-        blob_id: u256,
-        size: u64,
-        encoding_type: u8,
-        registered_epoch: u32,
-        is_deletable: bool,
-        // Application-level metadata
-        is_encrypted: bool, // Our content classification
-    }
-    
     public struct PublicationVault has key, store {
         id: UID,
         publication_id: ID,
-        blobs: Table<u256, WalrusBlob>, // Store Walrus-compatible blob objects
+        blobs: Table<u256, Blob>, // Store real Walrus Blob objects
+        blob_is_encrypted: Table<u256, bool>, // Side table for our app-specific metadata
         next_renewal_epoch: u64,
         renewal_batch_size: u64,
     }
@@ -72,6 +61,7 @@ module contracts::publication_vault {
             id,
             publication_id,
             blobs: table::new(ctx),
+            blob_is_encrypted: table::new(ctx),
             next_renewal_epoch: 0,
             renewal_batch_size,
         };
@@ -86,16 +76,11 @@ module contracts::publication_vault {
         transfer::share_object(vault);
     }
 
-    // Store blob with all Walrus metadata
-    // In production: Backend uploads to Walrus, gets Blob object, extracts this data, then calls this function
+    // Store a real Walrus blob
     public fun store_blob(
         vault: &mut PublicationVault,
         publication: &Publication,
-        blob_id: u256,
-        size: u64,
-        encoding_type: u8,
-        registered_epoch: u32,
-        is_deletable: bool,
+        blob: Blob,
         is_encrypted: bool,
         ctx: &TxContext,
     ) {
@@ -107,16 +92,9 @@ module contracts::publication_vault {
             ENotAuthorized,
         );
 
-        let walrus_blob = WalrusBlob {
-            blob_id,
-            size,
-            encoding_type,
-            registered_epoch,
-            is_deletable,
-            is_encrypted,
-        };
-        
-        table::add(&mut vault.blobs, blob_id, walrus_blob);
+        let blob_id = blob::blob_id(&blob);
+        table::add(&mut vault.blobs, blob_id, blob);
+        table::add(&mut vault.blob_is_encrypted, blob_id, is_encrypted);
 
         event::emit(BlobAdded {
             vault_id: object::id(vault),
@@ -127,8 +105,12 @@ module contracts::publication_vault {
         });
     }
 
-    public fun get_blob(vault: &PublicationVault, blob_id: u256): &WalrusBlob {
+    public fun get_blob(vault: &PublicationVault, blob_id: u256): &Blob {
         table::borrow(&vault.blobs, blob_id)
+    }
+
+    public fun get_blob_is_encrypted(vault: &PublicationVault, blob_id: u256): bool {
+        *table::borrow(&vault.blob_is_encrypted, blob_id)
     }
 
     public fun remove_blob(
@@ -136,7 +118,7 @@ module contracts::publication_vault {
         publication: &Publication,
         blob_id: u256,
         ctx: &TxContext,
-    ): WalrusBlob {
+    ): Blob {
         let author = tx_context::sender(ctx);
         assert!(object::id(publication) == vault.publication_id, ENotAuthorized);
         assert!(
@@ -144,17 +126,19 @@ module contracts::publication_vault {
             ENotAuthorized,
         );
 
+        // Also remove our app-specific metadata
+        table::remove(&mut vault.blob_is_encrypted, blob_id);
         table::remove(&mut vault.blobs, blob_id)
     }
 
-    public fun get_blob_info(blob: &WalrusBlob): (u256, u64, u8, u32, bool, bool) {
+    public fun get_blob_info(blob: &Blob, is_encrypted: bool): (u256, u64, u8, u32, bool, bool) {
         (
-            blob.blob_id,
-            blob.size,
-            blob.encoding_type,
-            blob.registered_epoch,
-            blob.is_deletable,
-            blob.is_encrypted
+            blob::blob_id(blob),
+            blob::size(blob),
+            blob::encoding_type(blob),
+            blob::registered_epoch(blob),
+            blob::is_deletable(blob),
+            is_encrypted
         )
     }
 
@@ -227,46 +211,22 @@ module contracts::publication_vault {
             id,
             publication_id,
             blobs: table::new(ctx),
+            blob_is_encrypted: table::new(ctx),
             next_renewal_epoch: 0,
             renewal_batch_size,
         }
     }
 
+    use contracts::walrus_test_utils;
+
     #[test_only]
-    public fun create_test_walrus_blob(
-        blob_id: u256,
-        size: u64,
-        encoding_type: u8,
+    public fun create_and_store_test_blob(
+        vault: &mut PublicationVault,
+        publication: &Publication,
         is_encrypted: bool,
-    ): WalrusBlob {
-        WalrusBlob {
-            blob_id,
-            size,
-            encoding_type,
-            registered_epoch: 0,
-            is_deletable: false,
-            is_encrypted,
-        }
+        ctx: &mut TxContext,
+    ) {
+        let blob = walrus_test_utils::new_test_blob_without_system(ctx);
+        store_blob(vault, publication, blob, is_encrypted, ctx);
     }
-    
-    // === Backend Integration Notes ===
-    // 
-    // Production Integration Workflow:
-    // 1. User uploads file via frontend
-    // 2. Backend uploads to Walrus via API: `PUT /v1/blobs`
-    // 3. Walrus returns actual Blob object with properties:
-    //    - blob_id: u256
-    //    - size: u64  
-    //    - encoding_type: u8
-    //    - registered_epoch: u32
-    //    - is_deletable: bool
-    // 4. Backend extracts these values from the Walrus Blob object
-    // 5. Backend calls store_blob() with extracted values + is_encrypted flag
-    // 6. Smart contract stores WalrusBlob with all original Walrus data
-    //
-    // Future Enhancement:
-    // When Walrus module imports are resolved, we can:
-    // - Accept actual walrus::system::Blob objects directly
-    // - Use walrus::system::blob_id(), walrus::system::size(), etc.
-    // - Store actual Blob objects instead of extracted data
 }

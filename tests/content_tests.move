@@ -3,10 +3,12 @@ module contracts::content_tests {
     use contracts::publication::{Self, Publication, PublicationOwnerCap};
     use contracts::publication_vault::{Self, PublicationVault};
     use contracts::content_registry::{Self, Article};
-    use contracts::inkray_test_utils::{admin, creator, contributor, user1};
+    use contracts::inkray_test_utils::{creator, contributor, user1};
     use contracts::inkray_test_utils as test_utils;
     use sui::test_scenario::{Self, Scenario};
     use std::string;
+    use walrus::blob;
+    use contracts::walrus_test_utils;
 
     fun setup_publication_and_vault(scenario: &mut Scenario): ID {
         test_utils::next_tx(scenario, creator());
@@ -53,38 +55,38 @@ module contracts::content_tests {
     fun test_publish_article_by_contributor() {
         let mut scenario = test_utils::begin_scenario(creator());
         let _publication_id = setup_publication_and_vault(&mut scenario);
-
         // Contributor publishes article
         test_utils::next_tx(&mut scenario, contributor());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let blob_id = blob::blob_id(&blob);
 
             let article = content_registry::publish_article(
                 &publication,
                 &mut vault,
                 test_utils::get_test_article_title(),
                 test_utils::get_test_article_summary(),
-                test_utils::get_test_blob_id(),
-                test_utils::get_test_blob_size(),
+                blob,
                 false, // free content
                 test_scenario::ctx(&mut scenario)
             );
 
             // Verify article properties
-            let (pub_id, author, title, summary, blob_id, is_paid, _created_at) = 
+            let (pub_id, author, title, summary, ret_blob_id, is_paid, _created_at) =
                 content_registry::get_article_info(&article);
             
             test_utils::assert_eq(pub_id, object::id(&publication));
             test_utils::assert_eq(author, contributor());
             test_utils::assert_eq(title, test_utils::get_test_article_title());
             test_utils::assert_eq(summary, test_utils::get_test_article_summary());
-            test_utils::assert_eq(blob_id, test_utils::get_test_blob_id());
+            test_utils::assert_eq(ret_blob_id, blob_id);
             test_utils::assert_false(is_paid);
 
             // Verify blob was stored in vault
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
-            test_utils::assert_true(publication_vault::has_blob(&vault, test_utils::get_test_blob_id()));
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id));
 
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
@@ -105,6 +107,8 @@ module contracts::content_tests {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_sender<Publication>(&scenario);
             let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
+            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let blob_id = blob::blob_id(&blob);
 
             let article = content_registry::publish_article_as_owner(
                 &publication,
@@ -112,25 +116,24 @@ module contracts::content_tests {
                 &owner_cap,
                 string::utf8(b"Owner Article"),
                 string::utf8(b"Article by owner"),
-                test_utils::get_test_encrypted_blob_id(),
-                test_utils::get_test_blob_size(),
+                blob,
                 true, // paid content
                 test_scenario::ctx(&mut scenario)
             );
 
             // Verify article properties
-            let (pub_id, author, title, _summary, blob_id, is_paid, _created_at) = 
+            let (pub_id, author, title, _summary, ret_blob_id, is_paid, _created_at) =
                 content_registry::get_article_info(&article);
             
             test_utils::assert_eq(pub_id, object::id(&publication));
             test_utils::assert_eq(author, creator());
             test_utils::assert_eq(title, string::utf8(b"Owner Article"));
-            test_utils::assert_eq(blob_id, test_utils::get_test_encrypted_blob_id());
+            test_utils::assert_eq(ret_blob_id, blob_id);
             test_utils::assert_true(is_paid);
 
             // Verify blob was stored in vault
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
-            test_utils::assert_true(publication_vault::has_blob(&vault, test_utils::get_test_encrypted_blob_id()));
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id));
 
             test_utils::return_shared(vault);
             test_utils::return_to_sender(&scenario, publication);
@@ -152,14 +155,14 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
 
             let article = content_registry::publish_article(
                 &publication,
                 &mut vault,
                 string::utf8(b"Unauthorized Article"),
                 string::utf8(b"This should fail"),
-                999u256,
-                test_utils::get_test_blob_size(),
+                blob,
                 false,
                 test_scenario::ctx(&mut scenario)
             );
@@ -182,14 +185,14 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
 
             let article = content_registry::publish_article(
                 &publication,
                 &mut vault,
                 string::utf8(b"Original Title"),
                 string::utf8(b"Original summary"),
-                test_utils::get_test_blob_id(),
-                test_utils::get_test_blob_size(),
+                blob,
                 false,
                 test_scenario::ctx(&mut scenario)
             );
@@ -237,6 +240,8 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let blob1 = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let blob_id1 = blob::blob_id(&blob1);
 
             // Free article
             let free_article = content_registry::publish_article(
@@ -244,28 +249,28 @@ module contracts::content_tests {
                 &mut vault,
                 string::utf8(b"Free Article"),
                 string::utf8(b"Everyone can read this"),
-                1001u256,
-                test_utils::get_test_blob_size(),
+                blob1,
                 false,
                 test_scenario::ctx(&mut scenario)
             );
 
+            let blob2 = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let blob_id2 = blob::blob_id(&blob2);
             // Paid article
             let paid_article = content_registry::publish_article(
                 &publication,
                 &mut vault,
                 string::utf8(b"Premium Article"),
                 string::utf8(b"This costs money"),
-                1002u256,
-                test_utils::get_test_blob_size(),
+                blob2,
                 true,
                 test_scenario::ctx(&mut scenario)
             );
 
             // Verify vault has both blobs
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 2);
-            test_utils::assert_true(publication_vault::has_blob(&vault, 1001u256));
-            test_utils::assert_true(publication_vault::has_blob(&vault, 1002u256));
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id1));
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id2));
 
             // Verify article properties
             test_utils::assert_false(content_registry::is_paid_content(&free_article));
@@ -307,14 +312,14 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
 
             let article1 = content_registry::publish_article(
                 &publication,
                 &mut vault,
                 string::utf8(b"Article by Contributor 1"),
                 string::utf8(b"First contributor's work"),
-                2001u256,
-                test_utils::get_test_blob_size(),
+                blob,
                 false,
                 test_scenario::ctx(&mut scenario)
             );
@@ -329,14 +334,15 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let blob_id2 = blob::blob_id(&blob);
 
             let article2 = content_registry::publish_article(
                 &publication,
                 &mut vault,
                 string::utf8(b"Article by Contributor 2"),
                 string::utf8(b"Second contributor's work"),
-                2002u256,
-                test_utils::get_test_blob_size(),
+                blob,
                 false,
                 test_scenario::ctx(&mut scenario)
             );
@@ -346,12 +352,15 @@ module contracts::content_tests {
 
             // Verify both blobs exist in vault
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 2);
-            test_utils::assert_true(publication_vault::has_blob(&vault, 2001u256));
-            test_utils::assert_true(publication_vault::has_blob(&vault, 2002u256));
+            let blob1 = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let blob_id1 = blob::blob_id(&blob1);
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id1));
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id2));
 
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
             test_utils::return_to_sender(&scenario, article2);
+            blob1.burn();
         };
 
         test_utils::end_scenario(scenario);

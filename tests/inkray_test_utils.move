@@ -45,33 +45,12 @@ module contracts::inkray_test_utils {
         string::utf8(b"This is a test article summary for testing purposes")
     }
 
-    public fun get_test_blob_id(): u256 {
-        123456789u256
-    }
-
-    public fun get_test_encrypted_blob_id(): u256 {
-        987654321u256
-    }
-
-    public fun get_test_encrypted_encoding_type(): u8 {
-        0u8 // Same as regular encoding type for Walrus
-    }
-
-    public fun get_test_blob_size(): u64 {
-        1024u64
-    }
-
-    public fun get_test_encoding_type(): u8 {
-        0u8 // RS erasure coding
-    }
-
-    public fun get_test_registered_epoch(): u32 {
-        0u32 // Current epoch
-    }
-
-    public fun is_test_blob_deletable(): bool {
-        false // Permanent storage
-    }
+    // Walrus constants
+    public fun get_test_blob_size(): u64 { 1024 }
+    public fun get_test_encoding_type(): u8 { 0 } // RS erasure coding
+    public fun get_test_n_shards(): u16 { 10 }
+    public fun get_test_registered_epoch(): u32 { 0 } // Current epoch
+    public fun is_test_blob_deletable(): bool { false } // Permanent storage
 
     // === Time Constants (in milliseconds) ===
     
@@ -220,13 +199,17 @@ module contracts::inkray_test_utils {
         };
     }
 
+    use contracts::walrus_test_utils;
+    use walrus::system::System;
+
     // === Walrus Blob Testing Helpers ===
     
     public fun create_test_blob_and_store(
         scenario: &mut Scenario,
         sender: address,
-        blob_id: u256,
-        is_encrypted: bool
+        root_hash: u256,
+        is_encrypted: bool,
+        system: &mut System
     ) {
         use contracts::publication_vault;
         
@@ -234,15 +217,12 @@ module contracts::inkray_test_utils {
         {
             let mut vault = take_shared<contracts::publication_vault::PublicationVault>(scenario);
             let publication = take_from_sender<contracts::publication::Publication>(scenario);
+            let blob = walrus_test_utils::new_test_blob_with_system(root_hash, test_scenario::ctx(scenario), system);
             
             publication_vault::store_blob(
                 &mut vault,
                 &publication,
-                blob_id,
-                get_test_blob_size(),
-                get_test_encoding_type(),
-                get_test_registered_epoch(),
-                is_test_blob_deletable(),
+                blob,
                 is_encrypted,
                 test_scenario::ctx(scenario)
             );
@@ -255,7 +235,8 @@ module contracts::inkray_test_utils {
     public fun create_multiple_test_blobs(
         scenario: &mut Scenario,
         sender: address,
-        count: u64
+        count: u64,
+        system: &mut System
     ) {
         use contracts::publication_vault;
         
@@ -266,17 +247,14 @@ module contracts::inkray_test_utils {
             
             let mut i = 0;
             while (i < count) {
-                let blob_id = (1000u256 + (i as u256));
+                let root_hash = (1000u256 + (i as u256));
                 let is_encrypted = (i % 2 == 1); // Alternate between encrypted and unencrypted
+                let blob = walrus_test_utils::new_test_blob_with_system(root_hash, test_scenario::ctx(scenario), system);
                 
                 publication_vault::store_blob(
                     &mut vault,
                     &publication,
-                    blob_id,
-                    get_test_blob_size(),
-                    get_test_encoding_type(),
-                get_test_registered_epoch(),
-                is_test_blob_deletable(),
+                    blob,
                     is_encrypted,
                     test_scenario::ctx(scenario)
                 );

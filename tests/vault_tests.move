@@ -2,12 +2,13 @@
 module contracts::vault_tests {
     use contracts::publication_vault::{Self, PublicationVault, RenewCap};
     use contracts::publication as publication;
-    use contracts::publication::{Publication, PublicationOwnerCap};
+    use contracts::publication::Publication;
     use contracts::inkray_test_utils::{admin, creator, contributor, user1};
     use contracts::inkray_test_utils as test_utils;
-    use contracts::inkray_test_utils::{get_test_registered_epoch, is_test_blob_deletable, get_test_encrypted_encoding_type};
-    use sui::test_scenario::{Self, Scenario};
+    use sui::test_scenario;
     use std::string;
+    use walrus::blob;
+    use contracts::walrus_test_utils;
 
     #[test]
     fun test_create_shared_vault() {
@@ -76,40 +77,23 @@ module contracts::vault_tests {
             test_utils::return_to_sender(&scenario, owner_cap);
         };
         
-        // Contributor stores blob
         test_utils::next_tx(&mut scenario, contributor());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                test_utils::get_test_blob_id(),
-                test_utils::get_test_blob_size(),
-                test_utils::get_test_encoding_type(),
-                test_utils::get_test_registered_epoch(),
-                test_utils::is_test_blob_deletable(),
-                false, // not encrypted
-                test_scenario::ctx(&mut scenario)
-            );
-            
-            // Verify blob was stored
+            publication_vault::create_and_store_test_blob(&mut vault, &publication, false, test_scenario::ctx(&mut scenario));
+
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
-            test_utils::assert_true(publication_vault::has_blob(&vault, test_utils::get_test_blob_id()));
-            
-            // Store encrypted blob
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                test_utils::get_test_encrypted_blob_id(),
-                test_utils::get_test_blob_size(),
-                test_utils::get_test_encrypted_encoding_type(),
-                test_utils::get_test_registered_epoch(),
-                test_utils::is_test_blob_deletable(),
-                true, // encrypted
-                test_scenario::ctx(&mut scenario)
-            );
+
+            test_utils::return_shared(vault);
+            test_utils::return_to_address(creator(), publication);
+        };
+
+        test_utils::next_tx(&mut scenario, contributor());
+        {
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let publication = test_utils::take_from_address<Publication>(&scenario, creator());
+            publication_vault::create_and_store_test_blob(&mut vault, &publication, true, test_scenario::ctx(&mut scenario));
             
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 2);
             
@@ -127,7 +111,7 @@ module contracts::vault_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (publication, owner_cap) = publication::create_publication(
                 string::utf8(b"Owner Publication"),
                 string::utf8(b"Owner Description"),
                 @0x0.to_id(),
@@ -145,23 +129,11 @@ module contracts::vault_tests {
             test_utils::return_to_sender(&scenario, owner_cap);
         };
         
-        // Owner stores blob
         test_utils::next_tx(&mut scenario, creator());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_sender<Publication>(&scenario);
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                test_utils::get_test_blob_id(),
-                test_utils::get_test_blob_size(),
-                test_utils::get_test_encoding_type(),
-                test_utils::get_test_registered_epoch(),
-                test_utils::is_test_blob_deletable(),
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
+            publication_vault::create_and_store_test_blob(&mut vault, &publication, false, test_scenario::ctx(&mut scenario));
             
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
             
@@ -197,23 +169,11 @@ module contracts::vault_tests {
             test_utils::return_to_sender(&scenario, owner_cap);
         };
         
-        // user1 tries to store blob (should fail)
         test_utils::next_tx(&mut scenario, user1());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                test_utils::get_test_blob_id(),
-                test_utils::get_test_blob_size(),
-                test_utils::get_test_encoding_type(),
-                test_utils::get_test_registered_epoch(),
-                test_utils::is_test_blob_deletable(),
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
+            publication_vault::create_and_store_test_blob(&mut vault, &publication, false, test_scenario::ctx(&mut scenario));
             
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
@@ -225,6 +185,7 @@ module contracts::vault_tests {
     #[test]
     fun test_get_and_remove_blob() {
         let mut scenario = test_utils::begin_scenario(creator());
+        let blob_id: u256;
         
         // Create publication and store blob
         test_utils::next_tx(&mut scenario, creator());
@@ -246,23 +207,12 @@ module contracts::vault_tests {
             test_utils::return_to_sender(&scenario, owner_cap);
         };
         
-        // Store blob
         test_utils::next_tx(&mut scenario, creator());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_sender<Publication>(&scenario);
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                test_utils::get_test_blob_id(),
-                test_utils::get_test_blob_size(),
-                test_utils::get_test_encoding_type(),
-                test_utils::get_test_registered_epoch(),
-                test_utils::is_test_blob_deletable(),
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
+            publication_vault::create_and_store_test_blob(&mut vault, &publication, false, test_scenario::ctx(&mut scenario));
+            blob_id = walrus_test_utils::get_test_blob_id();
             
             test_utils::return_shared(vault);
             test_utils::return_to_sender(&scenario, publication);
@@ -271,31 +221,37 @@ module contracts::vault_tests {
         // Get and verify blob info
         test_utils::next_tx(&mut scenario, creator());
         {
+            let vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let blob = publication_vault::get_blob(&vault, blob_id);
+            let is_encrypted = publication_vault::get_blob_is_encrypted(&vault, blob_id);
+            let (ret_blob_id, size, encoding, _, _, ret_is_encrypted) = publication_vault::get_blob_info(blob, is_encrypted);
+            
+            test_utils::assert_eq(ret_blob_id, blob_id);
+            test_utils::assert_eq(size, blob::size(blob));
+            test_utils::assert_eq(encoding, blob::encoding_type(blob));
+            test_utils::assert_false(ret_is_encrypted);
+            
+            test_utils::return_shared(vault);
+        };
+
+        // Remove blob
+        test_utils::next_tx(&mut scenario, creator());
+        {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_sender<Publication>(&scenario);
-            
-            let blob = publication_vault::get_blob(&vault, test_utils::get_test_blob_id());
-            let (blob_id, size, encoding, registered_epoch, is_deletable, is_encrypted) = publication_vault::get_blob_info(blob);
-            
-            test_utils::assert_eq(blob_id, test_utils::get_test_blob_id());
-            test_utils::assert_eq(size, test_utils::get_test_blob_size());
-            test_utils::assert_eq(encoding, test_utils::get_test_encoding_type());
-            test_utils::assert_false(is_encrypted);
-            
-            // Remove blob (only owner can remove)
             let removed_blob = publication_vault::remove_blob(
                 &mut vault,
                 &publication,
-                test_utils::get_test_blob_id(),
+                blob_id,
                 test_scenario::ctx(&mut scenario)
             );
             
             // Verify removal
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 0);
-            test_utils::assert_false(publication_vault::has_blob(&vault, test_utils::get_test_blob_id()));
+            test_utils::assert_false(publication_vault::has_blob(&vault, blob_id));
             
             // Clean up removed blob
-            let (_, _, _, _, _, _) = publication_vault::get_blob_info(&removed_blob);
+            removed_blob.burn();
             
             test_utils::return_shared(vault);
             test_utils::return_to_sender(&scenario, publication);
@@ -365,6 +321,7 @@ module contracts::vault_tests {
     #[test]
     fun test_multiple_contributors_shared_access() {
         let mut scenario = test_utils::begin_scenario(creator());
+        let blob_id1: u256;
         
         // Create publication with multiple contributors
         test_utils::next_tx(&mut scenario, creator());
@@ -390,50 +347,28 @@ module contracts::vault_tests {
             test_utils::return_to_sender(&scenario, owner_cap);
         };
         
-        // First contributor stores blob
         test_utils::next_tx(&mut scenario, contributor());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                1000u256,
-                test_utils::get_test_blob_size(),
-                test_utils::get_test_encoding_type(),
-                test_utils::get_test_registered_epoch(),
-                test_utils::is_test_blob_deletable(),
-                false,
-                test_scenario::ctx(&mut scenario)
-            );
+            publication_vault::create_and_store_test_blob(&mut vault, &publication, false, test_scenario::ctx(&mut scenario));
+            blob_id1 = walrus_test_utils::get_test_blob_id();
             
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
         };
         
-        // Second contributor stores blob
         test_utils::next_tx(&mut scenario, user1());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                2000u256,
-                test_utils::get_test_blob_size(),
-                test_utils::get_test_encoding_type(),
-                test_utils::get_test_registered_epoch(),
-                test_utils::is_test_blob_deletable(),
-                true, // encrypted
-                test_scenario::ctx(&mut scenario)
-            );
+            publication_vault::create_and_store_test_blob(&mut vault, &publication, true, test_scenario::ctx(&mut scenario));
+            let blob_id2 = walrus_test_utils::get_test_encrypted_blob_id();
             
             // Verify both blobs exist
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 2);
-            test_utils::assert_true(publication_vault::has_blob(&vault, 1000u256));
-            test_utils::assert_true(publication_vault::has_blob(&vault, 2000u256));
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id1));
+            test_utils::assert_true(publication_vault::has_blob(&vault, blob_id2));
             
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
