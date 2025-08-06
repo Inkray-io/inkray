@@ -1,0 +1,12 @@
+{
+  "network": "testnet",
+  "deployedAt": "2025-08-06T11:30:38.776Z",
+  "packageId": "0xbeff387ed0e6f0665dce27b8ebf73b1c06ee96d23723ce3866d6065e49c21dea",
+  "sharedObjects": {
+    "PLATFORM_TREASURY_ID": "0xce9683d5a844a5e898d07ce38fb3999691b1855c732bb184229ef9425ea6c2b3",
+    "MINT_CONFIG_ID": "0xf59971b952534356cc3c6baca0b7550e93d8212c9487ecfa25f18512e6fbe3df",
+    "PLATFORM_SERVICE_ID": "0xf5bea48797d50eeab41b357db6abf9d55c532c185f2368c57b0b42fb6cbbb790"
+  },
+  "upgradeCapId": "0x2524a86edf1a476464587ddd93c72ca8d3f6d26073e7aa6f64e4d3cb88ae6a58",
+  "deployer": "0x1ce895f610a98ee14452d4c49ee4bb1a36d2b4a88f6c6e5a6e137a582a23c26a"
+}
