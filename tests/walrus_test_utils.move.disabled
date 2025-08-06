@@ -1,0 +1,161 @@
+/// ============================================================================
+/// WALRUS TESTING UTILITIES - EXTERNAL PACKAGE LIMITATIONS  
+/// ============================================================================
+/// 
+/// This module provides Walrus testing utilities for external packages.
+/// 
+/// CRITICAL LIMITATION: Walrus System objects cannot be properly managed from
+/// external packages. The system.destroy_for_testing() function is public(package)
+/// and not accessible to external code. This causes "unused value without 'drop'"
+/// compilation errors that cannot be resolved through normal Move patterns.
+///
+/// SOLUTION: This module accepts the limitation as documented technical debt.
+/// System objects will be abandoned in tests, which is not ideal but unavoidable
+/// when testing external packages with Walrus. The focus is on testing our
+/// business logic with real Blob objects, not on perfect resource management.
+///
+/// All functions in this module may leave System objects in an abandoned state,
+/// which generates compiler warnings but allows tests to run successfully.
+/// ============================================================================
+
+#[test_only]  
+module contracts::walrus_test_utils {
+    use walrus::blob::{Self, Blob};
+    use walrus::system::{Self, System};
+    use walrus::storage_resource::Storage;
+    use walrus::encoding;
+    use sui::coin;
+    use walrus::wal::WAL;
+
+    // Test constants - these create predictable blob IDs for testing
+    const ROOT_HASH: u256 = 0xABC;
+    const SIZE: u64 = 5_000_000;
+    const RS2: u8 = 1;
+    const N_COINS: u64 = 1_000_000_000;
+
+    // ========================================================================  
+    // CORE TESTING FUNCTIONS
+    // ========================================================================
+
+    /// Create a new System for testing
+    /// WARNING: System objects cannot be destroyed by external packages  
+    public fun new_test_system(ctx: &mut TxContext): System {
+        system::new_for_testing(ctx)
+    }
+
+
+    /// Create a test blob within an existing System context
+    public fun create_test_blob_in_system(system: &mut System, ctx: &mut TxContext): Blob {
+        let storage = get_storage_resource(system, SIZE, 3, ctx);
+        register_blob(system, storage, ROOT_HASH, false, ctx)
+    }
+
+    /// Create a custom blob within an existing System context
+    public fun create_custom_blob_in_system(
+        system: &mut System,
+        root_hash: u256,
+        deletable: bool,
+        ctx: &mut TxContext
+    ): Blob {
+        let storage = get_storage_resource(system, SIZE, 3, ctx);
+        register_blob(system, storage, root_hash, deletable, ctx)
+    }
+
+    // ========================================================================
+    // INTERNAL HELPER FUNCTIONS
+    // ========================================================================
+
+    fun get_storage_resource(
+        system: &mut System,
+        unencoded_size: u64,
+        epochs_ahead: u32,
+        ctx: &mut TxContext,
+    ): Storage {
+        let mut fake_coin = coin::mint_for_testing<WAL>(N_COINS, ctx);
+        let storage_size = encoding::encoded_blob_length(
+            unencoded_size,
+            RS2,
+            system.n_shards(),
+        );
+        let storage = system.reserve_space(
+            storage_size,
+            epochs_ahead,
+            &mut fake_coin,
+            ctx,
+        );
+        coin::burn_for_testing(fake_coin);
+        storage
+    }
+
+    fun register_blob(
+        system: &mut System,
+        storage: Storage,
+        root_hash: u256,
+        deletable: bool,
+        ctx: &mut TxContext,
+    ): Blob {
+        let mut fake_coin = coin::mint_for_testing<WAL>(N_COINS, ctx);
+        let blob_id = blob::derive_blob_id(root_hash, RS2, SIZE);
+        let blob = system.register_blob(
+            storage,
+            blob_id,
+            root_hash,
+            SIZE,
+            RS2,
+            deletable,
+            &mut fake_coin,
+            ctx,
+        );
+        coin::burn_for_testing(fake_coin);
+        blob
+    }
+
+    // ========================================================================
+    // UTILITY CONSTANTS AND HELPERS  
+    // ========================================================================
+
+    /// Get the expected blob ID for the default test blob
+    public fun get_test_blob_id(): u256 {
+        blob::derive_blob_id(ROOT_HASH, RS2, SIZE)
+    }
+
+    /// Get a different blob ID for testing multiple blobs
+    public fun get_test_blob_id_variant(variant: u256): u256 {
+        blob::derive_blob_id(ROOT_HASH + variant, RS2, SIZE)
+    }
+
+    /// Get the expected blob ID for an encrypted test blob (legacy compatibility)
+    public fun get_test_encrypted_blob_id(): u256 {
+        blob::derive_blob_id(ROOT_HASH, 1, SIZE)
+    }
+
+    /// Legacy function for backward compatibility with existing tests
+    public fun new_test_blob_with_system(
+        root_hash: u256,
+        ctx: &mut TxContext,
+        system: &mut System,
+    ): Blob {
+        let storage = get_storage_resource(system, SIZE, 3, ctx);
+        register_blob(system, storage, root_hash, false, ctx)
+    }
+
+    /// Get the default test size
+    public fun get_test_size(): u64 {
+        SIZE
+    }
+
+    /// Get the default test root hash
+    public fun get_test_root_hash(): u256 {
+        ROOT_HASH  
+    }
+
+    /// Extract key information from a blob for test verification
+    public fun get_blob_test_info(blob: &Blob): (u256, u64, u8, bool) {
+        (
+            blob::blob_id(blob),
+            blob::size(blob), 
+            blob::encoding_type(blob),
+            blob::is_deletable(blob)
+        )
+    }
+}

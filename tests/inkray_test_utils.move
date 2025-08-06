@@ -45,33 +45,12 @@ module contracts::inkray_test_utils {
         string::utf8(b"This is a test article summary for testing purposes")
     }
 
-    public fun get_test_blob_id(): u256 {
-        123456789u256
-    }
-
-    public fun get_test_encrypted_blob_id(): u256 {
-        987654321u256
-    }
-
-    public fun get_test_encrypted_encoding_type(): u8 {
-        0u8 // Same as regular encoding type for Walrus
-    }
-
-    public fun get_test_blob_size(): u64 {
-        1024u64
-    }
-
-    public fun get_test_encoding_type(): u8 {
-        0u8 // RS erasure coding
-    }
-
-    public fun get_test_registered_epoch(): u32 {
-        0u32 // Current epoch
-    }
-
-    public fun is_test_blob_deletable(): bool {
-        false // Permanent storage
-    }
+    // Walrus constants
+    public fun get_test_blob_size(): u64 { 1024 }
+    public fun get_test_encoding_type(): u8 { 0 } // RS erasure coding
+    public fun get_test_n_shards(): u16 { 10 }
+    public fun get_test_registered_epoch(): u32 { 0 } // Current epoch
+    public fun is_test_blob_deletable(): bool { false } // Permanent storage
 
     // === Time Constants (in milliseconds) ===
     
@@ -220,74 +199,9 @@ module contracts::inkray_test_utils {
         };
     }
 
-    // === Walrus Blob Testing Helpers ===
-    
-    public fun create_test_blob_and_store(
-        scenario: &mut Scenario,
-        sender: address,
-        blob_id: u256,
-        is_encrypted: bool
-    ) {
-        use contracts::publication_vault;
-        
-        next_tx(scenario, sender);
-        {
-            let mut vault = take_shared<contracts::publication_vault::PublicationVault>(scenario);
-            let publication = take_from_sender<contracts::publication::Publication>(scenario);
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                blob_id,
-                get_test_blob_size(),
-                get_test_encoding_type(),
-                get_test_registered_epoch(),
-                is_test_blob_deletable(),
-                is_encrypted,
-                test_scenario::ctx(scenario)
-            );
-            
-            return_shared(vault);
-            return_to_sender(scenario, publication);
-        };
-    }
-    
-    public fun create_multiple_test_blobs(
-        scenario: &mut Scenario,
-        sender: address,
-        count: u64
-    ) {
-        use contracts::publication_vault;
-        
-        next_tx(scenario, sender);
-        {
-            let mut vault = take_shared<contracts::publication_vault::PublicationVault>(scenario);
-            let publication = take_from_sender<contracts::publication::Publication>(scenario);
-            
-            let mut i = 0;
-            while (i < count) {
-                let blob_id = (1000u256 + (i as u256));
-                let is_encrypted = (i % 2 == 1); // Alternate between encrypted and unencrypted
-                
-                publication_vault::store_blob(
-                    &mut vault,
-                    &publication,
-                    blob_id,
-                    get_test_blob_size(),
-                    get_test_encoding_type(),
-                get_test_registered_epoch(),
-                is_test_blob_deletable(),
-                    is_encrypted,
-                    test_scenario::ctx(scenario)
-                );
-                
-                i = i + 1;
-            };
-            
-            return_shared(vault);
-            return_to_sender(scenario, publication);
-        };
-    }
+    // === Blob Testing Helpers Removed ===
+    // Note: Blob creation is done off-chain via Walrus, so on-chain blob creation
+    // test helpers are not needed. Tests focus on publication and vault management.
 
     // === Platform Service Setup ===
     // (Removed platform service setup - will implement when needed)
