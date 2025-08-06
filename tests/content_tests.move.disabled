@@ -60,7 +60,8 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob = walrus_test_utils::create_test_blob_in_system(&mut system, test_scenario::ctx(&mut scenario));
             let blob_id = blob::blob_id(&blob);
 
             let article = content_registry::publish_article(
@@ -88,6 +89,8 @@ module contracts::content_tests {
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
             test_utils::assert_true(publication_vault::has_blob(&vault, blob_id));
 
+            // KNOWN LIMITATION: System object is abandoned due to Walrus package restrictions
+
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
             test_utils::return_to_sender(&scenario, article);
@@ -107,7 +110,8 @@ module contracts::content_tests {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_sender<Publication>(&scenario);
             let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
-            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob = walrus_test_utils::create_test_blob_in_system(&mut system, test_scenario::ctx(&mut scenario));
             let blob_id = blob::blob_id(&blob);
 
             let article = content_registry::publish_article_as_owner(
@@ -135,6 +139,8 @@ module contracts::content_tests {
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 1);
             test_utils::assert_true(publication_vault::has_blob(&vault, blob_id));
 
+            // KNOWN LIMITATION: System object is abandoned due to Walrus package restrictions
+
             test_utils::return_shared(vault);
             test_utils::return_to_sender(&scenario, publication);
             test_utils::return_to_sender(&scenario, owner_cap);
@@ -155,7 +161,8 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob = walrus_test_utils::create_test_blob_in_system(&mut system, test_scenario::ctx(&mut scenario));
 
             let article = content_registry::publish_article(
                 &publication,
@@ -166,6 +173,8 @@ module contracts::content_tests {
                 false,
                 test_scenario::ctx(&mut scenario)
             );
+
+            // KNOWN LIMITATION: System object is abandoned due to Walrus package restrictions
 
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
@@ -185,7 +194,8 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob = walrus_test_utils::create_test_blob_in_system(&mut system, test_scenario::ctx(&mut scenario));
 
             let article = content_registry::publish_article(
                 &publication,
@@ -196,6 +206,8 @@ module contracts::content_tests {
                 false,
                 test_scenario::ctx(&mut scenario)
             );
+
+            // KNOWN LIMITATION: System object is abandoned due to Walrus package restrictions
 
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
@@ -240,7 +252,8 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let blob1 = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system1 = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob1 = walrus_test_utils::create_test_blob_in_system(&mut system1, test_scenario::ctx(&mut scenario));
             let blob_id1 = blob::blob_id(&blob1);
 
             // Free article
@@ -254,7 +267,13 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            let blob2 = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system2 = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob2 = walrus_test_utils::create_custom_blob_in_system(
+                &mut system2,
+                walrus_test_utils::get_test_root_hash() + 1, // Different root hash for unique blob
+                false,
+                test_scenario::ctx(&mut scenario)
+            );
             let blob_id2 = blob::blob_id(&blob2);
             // Paid article
             let paid_article = content_registry::publish_article(
@@ -275,6 +294,8 @@ module contracts::content_tests {
             // Verify article properties
             test_utils::assert_false(content_registry::is_paid_content(&free_article));
             test_utils::assert_true(content_registry::is_paid_content(&paid_article));
+
+            // KNOWN LIMITATION: System objects are abandoned due to Walrus package restrictions
 
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
@@ -308,11 +329,14 @@ module contracts::content_tests {
         };
 
         // First contributor publishes
+        let blob_id1: u256;
         test_utils::next_tx(&mut scenario, contributor());
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system1 = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob = walrus_test_utils::create_test_blob_in_system(&mut system1, test_scenario::ctx(&mut scenario));
+            blob_id1 = blob::blob_id(&blob);
 
             let article1 = content_registry::publish_article(
                 &publication,
@@ -324,6 +348,8 @@ module contracts::content_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
+            // KNOWN LIMITATION: System object is abandoned due to Walrus package restrictions
+
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
             test_utils::return_to_sender(&scenario, article1);
@@ -334,7 +360,13 @@ module contracts::content_tests {
         {
             let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
             let publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let blob = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
+            let mut system2 = walrus_test_utils::new_test_system(test_scenario::ctx(&mut scenario));
+            let blob = walrus_test_utils::create_custom_blob_in_system(
+                &mut system2,
+                walrus_test_utils::get_test_root_hash() + 2, // Different root hash for unique blob
+                false,
+                test_scenario::ctx(&mut scenario)
+            );
             let blob_id2 = blob::blob_id(&blob);
 
             let article2 = content_registry::publish_article(
@@ -352,15 +384,14 @@ module contracts::content_tests {
 
             // Verify both blobs exist in vault
             test_utils::assert_eq(publication_vault::get_blob_count(&vault), 2);
-            let blob1 = walrus_test_utils::new_test_blob(test_scenario::ctx(&mut scenario));
-            let blob_id1 = blob::blob_id(&blob1);
             test_utils::assert_true(publication_vault::has_blob(&vault, blob_id1));
             test_utils::assert_true(publication_vault::has_blob(&vault, blob_id2));
+
+            // KNOWN LIMITATION: System object is abandoned due to Walrus package restrictions
 
             test_utils::return_shared(vault);
             test_utils::return_to_address(creator(), publication);
             test_utils::return_to_sender(&scenario, article2);
-            blob1.burn();
         };
 
         test_utils::end_scenario(scenario);

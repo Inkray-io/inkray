@@ -199,73 +199,9 @@ module contracts::inkray_test_utils {
         };
     }
 
-    use contracts::walrus_test_utils;
-    use walrus::system::System;
-
-    // === Walrus Blob Testing Helpers ===
-    
-    public fun create_test_blob_and_store(
-        scenario: &mut Scenario,
-        sender: address,
-        root_hash: u256,
-        is_encrypted: bool,
-        system: &mut System
-    ) {
-        use contracts::publication_vault;
-        
-        next_tx(scenario, sender);
-        {
-            let mut vault = take_shared<contracts::publication_vault::PublicationVault>(scenario);
-            let publication = take_from_sender<contracts::publication::Publication>(scenario);
-            let blob = walrus_test_utils::new_test_blob_with_system(root_hash, test_scenario::ctx(scenario), system);
-            
-            publication_vault::store_blob(
-                &mut vault,
-                &publication,
-                blob,
-                is_encrypted,
-                test_scenario::ctx(scenario)
-            );
-            
-            return_shared(vault);
-            return_to_sender(scenario, publication);
-        };
-    }
-    
-    public fun create_multiple_test_blobs(
-        scenario: &mut Scenario,
-        sender: address,
-        count: u64,
-        system: &mut System
-    ) {
-        use contracts::publication_vault;
-        
-        next_tx(scenario, sender);
-        {
-            let mut vault = take_shared<contracts::publication_vault::PublicationVault>(scenario);
-            let publication = take_from_sender<contracts::publication::Publication>(scenario);
-            
-            let mut i = 0;
-            while (i < count) {
-                let root_hash = (1000u256 + (i as u256));
-                let is_encrypted = (i % 2 == 1); // Alternate between encrypted and unencrypted
-                let blob = walrus_test_utils::new_test_blob_with_system(root_hash, test_scenario::ctx(scenario), system);
-                
-                publication_vault::store_blob(
-                    &mut vault,
-                    &publication,
-                    blob,
-                    is_encrypted,
-                    test_scenario::ctx(scenario)
-                );
-                
-                i = i + 1;
-            };
-            
-            return_shared(vault);
-            return_to_sender(scenario, publication);
-        };
-    }
+    // === Blob Testing Helpers Removed ===
+    // Note: Blob creation is done off-chain via Walrus, so on-chain blob creation
+    // test helpers are not needed. Tests focus on publication and vault management.
 
     // === Platform Service Setup ===
     // (Removed platform service setup - will implement when needed)

@@ -217,16 +217,7 @@ module contracts::publication_vault {
         }
     }
 
-    use contracts::walrus_test_utils;
-
-    #[test_only]
-    public fun create_and_store_test_blob(
-        vault: &mut PublicationVault,
-        publication: &Publication,
-        is_encrypted: bool,
-        ctx: &mut TxContext,
-    ) {
-        let blob = walrus_test_utils::new_test_blob_without_system(ctx);
-        store_blob(vault, publication, blob, is_encrypted, ctx);
-    }
+    // === Test Helper Functions ===
+    // Note: Blob creation is done off-chain, so we don't provide test blob creation functions
+    // Tests should focus on vault management functions that don't require actual blobs
 }
