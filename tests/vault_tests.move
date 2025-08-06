@@ -1,10 +1,12 @@
 #[test_only]
 module contracts::vault_tests {
     use contracts::publication_vault::{Self, PublicationVault, RenewCap};
+    use contracts::mock_blob::MockBlob;
     use contracts::inkray_test_utils::{admin, creator};
     use contracts::inkray_test_utils as test_utils;
     use sui::test_scenario;
 
+    /// Test that a shared vault can be created.
     #[test]
     fun test_create_shared_vault() {
         let mut scenario = test_utils::begin_scenario(creator());
@@ -15,7 +17,7 @@ module contracts::vault_tests {
             let publication_id = @0x1.to_id();
             let batch_size = 10u64;
             
-            publication_vault::create_vault(
+            publication_vault::create_vault<MockBlob>(
                 publication_id,
                 batch_size,
                 test_scenario::ctx(&mut scenario)
@@ -25,7 +27,7 @@ module contracts::vault_tests {
         // Verify vault was created and shared
         test_utils::next_tx(&mut scenario, creator());
         {
-            let vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let vault = test_utils::take_shared<PublicationVault<MockBlob>>(&scenario);
             
             // Verify vault properties
             let (pub_id, renewal_epoch, vault_batch_size) = publication_vault::get_vault_info(&vault);
@@ -44,6 +46,7 @@ module contracts::vault_tests {
         test_utils::end_scenario(scenario);
     }
 
+    /// Test the storage renewal system.
     #[test]
     fun test_renewal_system_with_shared_vault() {
         let mut scenario = test_utils::begin_scenario(admin());
@@ -57,7 +60,7 @@ module contracts::vault_tests {
         // Create shared vault and test renewal
         test_utils::next_tx(&mut scenario, admin()); 
         {
-            publication_vault::create_vault(
+            publication_vault::create_vault<MockBlob>(
                 @0x1.to_id(),
                 10,
                 test_scenario::ctx(&mut scenario)
@@ -67,7 +70,7 @@ module contracts::vault_tests {
         // Test renewal functionality
         test_utils::next_tx(&mut scenario, admin());
         {
-            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let mut vault = test_utils::take_shared<PublicationVault<MockBlob>>(&scenario);
             let renew_cap = test_utils::take_from_sender<RenewCap>(&scenario);
             
             // Verify initial state
@@ -101,6 +104,7 @@ module contracts::vault_tests {
         test_utils::end_scenario(scenario);
     }
 
+    /// Test the vault management functions.
     #[test]
     fun test_vault_management_functions() {
         let mut scenario = test_utils::begin_scenario(creator());
@@ -108,7 +112,7 @@ module contracts::vault_tests {
         // Create vault
         test_utils::next_tx(&mut scenario, creator());
         {
-            publication_vault::create_vault(
+            publication_vault::create_vault<MockBlob>(
                 @0x1.to_id(),
                 5,
                 test_scenario::ctx(&mut scenario)
@@ -118,7 +122,7 @@ module contracts::vault_tests {
         // Test vault management functions
         test_utils::next_tx(&mut scenario, creator());
         {
-            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
+            let mut vault = test_utils::take_shared<PublicationVault<MockBlob>>(&scenario);
             
             // Test basic properties
             let (pub_id, renewal_epoch, batch_size) = publication_vault::get_vault_info(&vault);

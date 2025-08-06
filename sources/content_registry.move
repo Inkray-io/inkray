@@ -3,8 +3,6 @@ module contracts::content_registry {
     use contracts::publication_vault::{Self, PublicationVault};
     use sui::event;
     use std::string::String;
-    use walrus::blob::Blob;
-
     // === Errors ===
     const ENotAuthorized: u64 = 0;
     const EInvalidPublication: u64 = 1;
@@ -40,13 +38,14 @@ module contracts::content_registry {
     }
 
     // === Public Functions ===
-    fun publish_article_internal(
+    fun publish_article_internal<B: store>(
         publication: &Publication,
-        vault: &mut PublicationVault,
+        vault: &mut PublicationVault<B>,
         author: address,
         title: String,
         summary: String,
-        blob: Blob,
+        blob_id: u256,
+        blob: B,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -56,7 +55,6 @@ module contracts::content_registry {
         // Verify the vault matches the publication
         assert!(object::id(vault) == vault_id, EInvalidVault);
 
-        let blob_id = blob.blob_id();
         let id = object::new(ctx);
         let article_id = object::uid_to_inner(&id);
         let created_at = tx_context::epoch_timestamp_ms(ctx);
@@ -73,9 +71,10 @@ module contracts::content_registry {
         };
 
         // Store blob in vault
-        publication_vault::store_blob(
+        publication_vault::store_blob<B>(
             vault, 
-            publication, 
+            publication,
+            blob_id,
             blob,
             is_paid, // is_encrypted matches is_paid
             ctx
@@ -94,12 +93,13 @@ module contracts::content_registry {
         article
     }
 
-    public fun publish_article(
+    public fun publish_article<B: store>(
         publication: &Publication,
-        vault: &mut PublicationVault,
+        vault: &mut PublicationVault<B>,
         title: String,
         summary: String,
-        blob: Blob,
+        blob_id: u256,
+        blob: B,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -108,25 +108,27 @@ module contracts::content_registry {
         // Verify author is a contributor
         assert!(publication::is_contributor(publication, author), ENotAuthorized);
 
-        publish_article_internal(
+        publish_article_internal<B>(
             publication,
             vault,
             author,
             title,
             summary,
+            blob_id,
             blob,
             is_paid,
             ctx,
         )
     }
 
-    public fun publish_article_as_owner(
+    public fun publish_article_as_owner<B: store>(
         publication: &Publication,
-        vault: &mut PublicationVault,
+        vault: &mut PublicationVault<B>,
         owner_cap: &PublicationOwnerCap,
         title: String,
         summary: String,
-        blob: Blob,
+        blob_id: u256,
+        blob: B,
         is_paid: bool,
         ctx: &mut TxContext
     ): Article {
@@ -136,12 +138,13 @@ module contracts::content_registry {
         // Verify ownership
         assert!(publication::get_publication_id(owner_cap) == publication_id, ENotAuthorized);
 
-        publish_article_internal(
+        publish_article_internal<B>(
             publication,
             vault,
             author,
             title,
             summary,
+            blob_id,
             blob,
             is_paid,
             ctx,
