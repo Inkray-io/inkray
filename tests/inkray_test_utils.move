@@ -168,6 +168,7 @@ module contracts::inkray_test_utils {
     public fun standard_publication_setup(scenario: &mut Scenario) {
         use contracts::publication;
         use contracts::publication_vault;
+        use contracts::mock_blob::MockBlob;
 
         next_tx(scenario, creator());
         {
@@ -180,7 +181,7 @@ module contracts::inkray_test_utils {
             );
 
             // Create shared vault - now creates and shares automatically  
-            publication_vault::create_vault(
+            publication_vault::create_vault<MockBlob>(
                 object::id(&publication),
                 10, // batch size
                 test_scenario::ctx(scenario)

@@ -115,17 +115,18 @@ module contracts::publication {
     }
 
     // === View Functions ===
-    public fun is_authorized_with_cap(
+    public fun is_owner_with_cap_or_contributor(
         publication: &Publication,
         user: address,
         owner_cap: &PublicationOwnerCap
     ): bool {
-        // Check if user is owner (has capability)
+        // If the owner cap is valid for this publication, authorization is granted.
+        // This implicitly checks the transaction sender's ownership of the cap.
         if (owner_cap.publication_id == object::id(publication)) {
             return true
         };
         
-        // Check if user is a contributor
+        // Otherwise, check if the `user` address is in the contributors list.
         vec_set::contains(&publication.contributors, &user)
     }
 

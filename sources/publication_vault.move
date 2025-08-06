@@ -2,17 +2,16 @@ module contracts::publication_vault {
     use contracts::publication::{Self as publication, Publication};
     use sui::event;
     use sui::table::{Self, Table};
-    use walrus::blob::{Self, Blob};
     
     // === Errors ===
     const ENotAuthorized: u64 = 0;
     
     // === Structs ===
     
-    public struct PublicationVault has key, store {
+    public struct PublicationVault<B: store> has key, store {
         id: UID,
         publication_id: ID,
-        blobs: Table<u256, Blob>, // Store real Walrus Blob objects
+        blobs: Table<u256, B>, // Generic blob type
         blob_is_encrypted: Table<u256, bool>, // Side table for our app-specific metadata
         next_renewal_epoch: u64,
         renewal_batch_size: u64,
@@ -53,11 +52,11 @@ module contracts::publication_vault {
     }
 
     // === Public Functions ===
-    public fun create_vault(publication_id: ID, renewal_batch_size: u64, ctx: &mut TxContext) {
+    public fun create_vault<B: store>(publication_id: ID, renewal_batch_size: u64, ctx: &mut TxContext) {
         let id = object::new(ctx);
         let vault_id = object::uid_to_inner(&id);
 
-        let vault = PublicationVault {
+        let vault = PublicationVault<B> {
             id,
             publication_id,
             blobs: table::new(ctx),
@@ -76,11 +75,11 @@ module contracts::publication_vault {
         transfer::share_object(vault);
     }
 
-    // Store a real Walrus blob
-    public fun store_blob(
-        vault: &mut PublicationVault,
+    public fun store_blob<B: store>(
+        vault: &mut PublicationVault<B>,
         publication: &Publication,
-        blob: Blob,
+        blob_id: u256,
+        blob: B,
         is_encrypted: bool,
         ctx: &TxContext,
     ) {
@@ -92,7 +91,6 @@ module contracts::publication_vault {
             ENotAuthorized,
         );
 
-        let blob_id = blob::blob_id(&blob);
         table::add(&mut vault.blobs, blob_id, blob);
         table::add(&mut vault.blob_is_encrypted, blob_id, is_encrypted);
 
@@ -105,20 +103,20 @@ module contracts::publication_vault {
         });
     }
 
-    public fun get_blob(vault: &PublicationVault, blob_id: u256): &Blob {
+    public fun get_blob<B: store>(vault: &PublicationVault<B>, blob_id: u256): &B {
         table::borrow(&vault.blobs, blob_id)
     }
 
-    public fun get_blob_is_encrypted(vault: &PublicationVault, blob_id: u256): bool {
+    public fun get_blob_is_encrypted<B: store>(vault: &PublicationVault<B>, blob_id: u256): bool {
         *table::borrow(&vault.blob_is_encrypted, blob_id)
     }
 
-    public fun remove_blob(
-        vault: &mut PublicationVault,
+    public fun remove_blob<B: store>(
+        vault: &mut PublicationVault<B>,
         publication: &Publication,
         blob_id: u256,
         ctx: &TxContext,
-    ): Blob {
+    ): B {
         let author = tx_context::sender(ctx);
         assert!(object::id(publication) == vault.publication_id, ENotAuthorized);
         assert!(
@@ -131,28 +129,17 @@ module contracts::publication_vault {
         table::remove(&mut vault.blobs, blob_id)
     }
 
-    public fun get_blob_info(blob: &Blob, is_encrypted: bool): (u256, u64, u8, u32, bool, bool) {
-        (
-            blob::blob_id(blob),
-            blob::size(blob),
-            blob::encoding_type(blob),
-            blob::registered_epoch(blob),
-            blob::is_deletable(blob),
-            is_encrypted
-        )
-    }
-
-    public fun has_blob(vault: &PublicationVault, blob_id: u256): bool {
+    public fun has_blob<B: store>(vault: &PublicationVault<B>, blob_id: u256): bool {
         table::contains(&vault.blobs, blob_id)
     }
 
-    public fun needs_renewal(vault: &PublicationVault, current_epoch: u64): bool {
+    public fun needs_renewal<B: store>(vault: &PublicationVault<B>, current_epoch: u64): bool {
         vault.next_renewal_epoch > 0 && current_epoch >= vault.next_renewal_epoch
     }
 
-    public fun update_renewal_epoch(
+    public fun update_renewal_epoch<B: store>(
         _: &RenewCap,
-        vault: &mut PublicationVault,
+        vault: &mut PublicationVault<B>,
         new_renewal_epoch: u64,
         ctx: &TxContext,
     ) {
@@ -167,23 +154,23 @@ module contracts::publication_vault {
     }
 
     // === View Functions ===
-    public fun get_vault_info(vault: &PublicationVault): (ID, u64, u64) {
+    public fun get_vault_info<B: store>(vault: &PublicationVault<B>): (ID, u64, u64) {
         (vault.publication_id, vault.next_renewal_epoch, vault.renewal_batch_size)
     }
 
-    public fun get_blob_count(vault: &PublicationVault): u64 {
+    public fun get_blob_count<B: store>(vault: &PublicationVault<B>): u64 {
         table::length(&vault.blobs)
     }
 
-    public fun has_renewal_scheduled(vault: &PublicationVault): bool {
+    public fun has_renewal_scheduled<B: store>(vault: &PublicationVault<B>): bool {
         vault.next_renewal_epoch > 0
     }
 
-    public fun get_renewal_batch_size(vault: &PublicationVault): u64 {
+    public fun get_renewal_batch_size<B: store>(vault: &PublicationVault<B>): u64 {
         vault.renewal_batch_size
     }
 
-    public fun set_renewal_batch_size(vault: &mut PublicationVault, new_batch_size: u64) {
+    public fun set_renewal_batch_size<B: store>(vault: &mut PublicationVault<B>, new_batch_size: u64) {
         vault.renewal_batch_size = new_batch_size;
     }
 
@@ -197,23 +184,6 @@ module contracts::publication_vault {
     public fun create_renew_cap_for_testing(ctx: &mut TxContext): RenewCap {
         RenewCap {
             id: object::new(ctx),
-        }
-    }
-
-    #[test_only]
-    public fun create_vault_for_testing(
-        publication_id: ID,
-        renewal_batch_size: u64,
-        ctx: &mut TxContext,
-    ): PublicationVault {
-        let id = object::new(ctx);
-        PublicationVault {
-            id,
-            publication_id,
-            blobs: table::new(ctx),
-            blob_is_encrypted: table::new(ctx),
-            next_renewal_epoch: 0,
-            renewal_batch_size,
         }
     }
 
