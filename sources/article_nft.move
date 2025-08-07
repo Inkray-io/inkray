@@ -180,16 +180,28 @@ module contracts::article_nft {
 
     // === Seal Approval Function ===
     // This function is called by Seal to verify NFT ownership for premium content access
-    public fun seal_approve_article_nft(
-        _identity: vector<u8>,
+    entry fun seal_approve(
+        id: vector<u8>,
+        article_nft: &ArticleNFT,
+        article: &Article,
+        ctx: &TxContext
+    ) {
+        assert!(approve_internal(id, article_nft, article, ctx), ENotOwner);
+    }
+
+    fun approve_internal(
+        _id: vector<u8>,
         article_nft: &ArticleNFT,
         article: &Article,
         _ctx: &TxContext
-    ) {
+    ): bool {
         // Verify the NFT is for the requested article
-        assert!(article_nft.article_id == object::id(article), ENotOwner);
-        // Verify the caller owns the NFT (implicit through object ownership)
-        // This check happens automatically in Sui's object model
+        if (article_nft.article_id != object::id(article)) {
+            return false
+        };
+        // NFT ownership is verified implicitly through Sui's object model
+        // The caller must own the NFT to pass it as a reference
+        true
     }
 
     // === View Functions ===

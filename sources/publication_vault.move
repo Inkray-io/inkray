@@ -1,5 +1,4 @@
 module contracts::publication_vault {
-    use contracts::publication::{Self as publication, Publication};
     use sui::event;
     use sui::table::{Self, Table};
     
@@ -10,7 +9,6 @@ module contracts::publication_vault {
     
     public struct PublicationVault<B: store> has key, store {
         id: UID,
-        publication_id: ID,
         blobs: Table<u256, B>, // Generic blob type
         blob_is_encrypted: Table<u256, bool>, // Side table for our app-specific metadata
         next_renewal_epoch: u64,
@@ -24,13 +22,11 @@ module contracts::publication_vault {
     // === Events ===
     public struct VaultCreated has copy, drop {
         vault_id: ID,
-        publication_id: ID,
         creator: address,
     }
 
     public struct BlobAdded has copy, drop {
         vault_id: ID,
-        publication_id: ID,
         blob_id: u256,
         is_encrypted: bool,
         author: address,
@@ -38,7 +34,6 @@ module contracts::publication_vault {
 
     public struct VaultRenewed has copy, drop {
         vault_id: ID,
-        publication_id: ID,
         new_renewal_epoch: u64,
         renewed_at: u64,
     }
@@ -52,13 +47,12 @@ module contracts::publication_vault {
     }
 
     // === Public Functions ===
-    public fun create_vault<B: store>(publication_id: ID, renewal_batch_size: u64, ctx: &mut TxContext) {
+    public fun create_vault<B: store>(renewal_batch_size: u64, ctx: &mut TxContext): ID {
         let id = object::new(ctx);
         let vault_id = object::uid_to_inner(&id);
 
         let vault = PublicationVault<B> {
             id,
-            publication_id,
             blobs: table::new(ctx),
             blob_is_encrypted: table::new(ctx),
             next_renewal_epoch: 0,
@@ -67,36 +61,28 @@ module contracts::publication_vault {
 
         event::emit(VaultCreated {
             vault_id,
-            publication_id,
             creator: tx_context::sender(ctx),
         });
 
         // Share the vault so contributors can access it
         transfer::share_object(vault);
+        vault_id
     }
 
     public fun store_blob<B: store>(
         vault: &mut PublicationVault<B>,
-        publication: &Publication,
         blob_id: u256,
         blob: B,
         is_encrypted: bool,
         ctx: &TxContext,
     ) {
         let author = tx_context::sender(ctx);
-        assert!(object::id(publication) == vault.publication_id, ENotAuthorized);
-        assert!(
-            publication::is_contributor(publication, author) ||
-                publication::is_owner(publication, author),
-            ENotAuthorized,
-        );
 
         table::add(&mut vault.blobs, blob_id, blob);
         table::add(&mut vault.blob_is_encrypted, blob_id, is_encrypted);
 
         event::emit(BlobAdded {
             vault_id: object::id(vault),
-            publication_id: vault.publication_id,
             blob_id,
             is_encrypted,
             author,
@@ -113,17 +99,11 @@ module contracts::publication_vault {
 
     public fun remove_blob<B: store>(
         vault: &mut PublicationVault<B>,
-        publication: &Publication,
         blob_id: u256,
-        ctx: &TxContext,
+        _ctx: &TxContext,
     ): B {
-        let author = tx_context::sender(ctx);
-        assert!(object::id(publication) == vault.publication_id, ENotAuthorized);
-        assert!(
-            publication::is_owner(publication, author), // Only owner can remove blobs
-            ENotAuthorized,
-        );
-
+        // Authorization should be handled at higher level (e.g., content_registry)
+        
         // Also remove our app-specific metadata
         table::remove(&mut vault.blob_is_encrypted, blob_id);
         table::remove(&mut vault.blobs, blob_id)
@@ -147,15 +127,14 @@ module contracts::publication_vault {
 
         event::emit(VaultRenewed {
             vault_id: object::id(vault),
-            publication_id: vault.publication_id,
             new_renewal_epoch,
             renewed_at: tx_context::epoch_timestamp_ms(ctx),
         });
     }
 
     // === View Functions ===
-    public fun get_vault_info<B: store>(vault: &PublicationVault<B>): (ID, u64, u64) {
-        (vault.publication_id, vault.next_renewal_epoch, vault.renewal_batch_size)
+    public fun get_vault_info<B: store>(vault: &PublicationVault<B>): (u64, u64) {
+        (vault.next_renewal_epoch, vault.renewal_batch_size)
     }
 
     public fun get_blob_count<B: store>(vault: &PublicationVault<B>): u64 {

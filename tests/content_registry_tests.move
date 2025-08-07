@@ -21,7 +21,7 @@ module contracts::content_registry_tests {
         publication::add_contributor(&owner_cap, &mut publication, test_utils::contributor(), test_scenario::ctx(scenario));
 
         publication_vault::create_vault<MockBlob>(
-            object::id(&publication), 10, test_scenario::ctx(scenario)
+            10, test_scenario::ctx(scenario)
         );
 
         test_utils::return_to_sender(scenario, publication);
@@ -245,7 +245,7 @@ module contracts::content_registry_tests {
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                @0xDEADBEEF.to_id(), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 

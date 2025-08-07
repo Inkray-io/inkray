@@ -103,16 +103,51 @@ export interface WalrusUploadResponse {
 
 // Seal-related types
 export interface SealEncryptionOptions {
-  policy: 'subscription' | 'nft' | 'allowlist';
-  policyObjectId?: string;
-  capId?: string;
-  identity?: string;
+  contentId: string; // The unique identifier for this content (article/media)
+  packageId?: string;
+  threshold?: number; // Number of key servers required for decryption (default: 2)
+}
+
+export interface UserCredentials {
+  subscription?: {
+    id: string;
+    serviceId: string;
+  };
+  nft?: {
+    id: string;
+    articleId: string;
+  };
+  publicationOwner?: {
+    ownerCapId: string;
+    publicationId: string;
+  };
+  contributor?: {
+    publicationId: string;
+    contentPolicyId: string;
+  };
+  allowlist?: {
+    contentPolicyId: string;
+  };
 }
 
 export interface SealDecryptionRequest {
   encryptedData: Uint8Array;
+  contentId: string; // The same ID used during encryption
+  credentials: UserCredentials; // Available user credentials
+  packageId?: string;
+}
+
+// Legacy interface for backward compatibility
+export interface SealDecryptionRequestLegacy {
+  encryptedData: Uint8Array;
   policy: string;
   identity: string;
+  policyPackageId?: string;
+  policyObjectId?: string;
+  subscriptionId?: string;
+  nftId?: string;
+  publicationId?: string;
+  articleId?: string;
   accessProof?: any;
 }
 

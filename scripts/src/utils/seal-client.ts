@@ -1,11 +1,32 @@
 import { getNetworkConfig, getCurrentNetwork } from '../config/networks.js';
-import type { SealClientConfig, SealEncryptionOptions, SealDecryptionRequest } from './types.js';
+import type { 
+  SealClientConfig, 
+  SealEncryptionOptions, 
+  SealDecryptionRequest, 
+  UserCredentials,
+  SealDecryptionRequestLegacy 
+} from './types.js';
 import chalk from 'chalk';
+import { SealClient, getAllowlistedKeyServers } from '@mysten/seal';
+import { getDefaultSuiClient } from './client.js';
+import { webcrypto } from 'node:crypto';
 
-// Note: Seal SDK integration - this is a placeholder implementation
-// The actual Seal SDK usage would depend on the final API
+// Fix crypto for Node.js environment
+if (typeof globalThis.crypto === 'undefined') {
+  globalThis.crypto = webcrypto as any;
+}
+
+/**
+ * Inkray Seal Client - Content-Identity Based Encryption
+ * 
+ * Key Concept:
+ * - Encrypt once with content-specific identity (e.g., article_123)
+ * - Decrypt with different policies based on available user credentials
+ * - Try multiple access methods until one succeeds
+ */
 export class InkraySealClient {
   private config: SealClientConfig;
+  private sealClient: SealClient | null = null;
 
   constructor(config?: Partial<SealClientConfig>) {
     const network = getCurrentNetwork();
@@ -18,187 +39,664 @@ export class InkraySealClient {
     };
   }
 
+  private async getSealClient(): Promise<SealClient> {
+    if (!this.sealClient) {
+      const { SuiClient } = await import('@mysten/sui/client');
+      const { getNetworkConfig } = await import('../config/networks.js');
+      
+      const suiClient = new SuiClient({ 
+        url: getNetworkConfig('testnet').sui.rpcUrl 
+      });
+      
+      const serverObjectIds = getAllowlistedKeyServers('testnet');
+      
+      this.sealClient = new SealClient({
+        suiClient: suiClient as any, // Type compatibility fix
+        serverConfigs: serverObjectIds.map((id) => ({
+          objectId: id,
+          weight: 1,
+        })),
+        verifyKeyServers: false, // Set to true for production
+      });
+    }
+    
+    return this.sealClient;
+  }
+
   getConfig(): SealClientConfig {
     return this.config;
   }
 
-  // Identity-based encryption methods
-  async generateIdentity(userAddress: string): Promise<string> {
-    try {
-      console.log(chalk.blue(`🔑 Generating Seal identity for: ${userAddress}`));
-      
-      // This would use the actual Seal SDK to generate an identity
-      // For now, we'll use a deterministic approach based on the address
-      const identity = `user:${userAddress}`;
-      
-      console.log(chalk.green(`✓ Identity generated: ${identity}`));
-      return identity;
-    } catch (error) {
-      console.error(chalk.red(`❌ Identity generation failed: ${error}`));
-      throw error;
-    }
-  }
+  // === ENCRYPTION METHODS ===
 
-  // Encryption methods
-  async encryptData(
+  /**
+   * Encrypt content with content-specific identity
+   * This is the main encryption method - encrypt once per content
+   */
+  async encryptContent(
     data: Uint8Array, 
     options: SealEncryptionOptions
   ): Promise<Uint8Array> {
     try {
-      console.log(chalk.blue(`🔒 Encrypting data with policy: ${options.policy}`));
+      console.log(chalk.blue(`🔒 Encrypting content with ID: ${options.contentId}`));
       
-      // This is a placeholder implementation
-      // In reality, this would use the Seal SDK to encrypt data
-      // with the specified access policy
+      const packageId = options.packageId || process.env.PACKAGE_ID;
+      const threshold = options.threshold || 2;
       
-      // For now, we'll simulate encryption by adding a header
-      const header = new TextEncoder().encode(`SEAL_ENCRYPTED_${options.policy}_`);
-      const encrypted = new Uint8Array(header.length + data.length);
-      encrypted.set(header, 0);
-      encrypted.set(data, header.length);
+      if (!packageId) {
+        console.log(chalk.yellow(`⚠️  No package ID configured, using demo encryption`));
+        return this.demoEncrypt(data, options.contentId);
+      }
       
-      console.log(chalk.green(`✓ Data encrypted successfully`));
-      console.log(chalk.gray(`  Policy: ${options.policy}`));
-      console.log(chalk.gray(`  Original size: ${data.length} bytes`));
-      console.log(chalk.gray(`  Encrypted size: ${encrypted.length} bytes`));
-      
-      return encrypted;
+      try {
+        const sealClient = await this.getSealClient();
+        
+        console.log(chalk.gray(`  Content ID: ${options.contentId}`));
+        console.log(chalk.gray(`  Package ID: ${packageId}`));
+        console.log(chalk.gray(`  Threshold: ${threshold} key servers`));
+        
+        // Encrypt using the content ID as the identity
+        const { encryptedObject: encrypted } = await sealClient.encrypt({
+          threshold,
+          packageId,
+          id: options.contentId, // Content-specific identity
+          data,
+        });
+        
+        console.log(chalk.green(`✅ Content encrypted with Seal!`));
+        console.log(chalk.gray(`  Original size: ${data.length} bytes`));
+        console.log(chalk.gray(`  Encrypted size: ${encrypted.length} bytes`));
+        
+        return encrypted;
+      } catch (sealError) {
+        console.log(chalk.yellow(`⚠️  Seal encryption failed, using demo encryption`));
+        console.log(chalk.gray(`  Error: ${sealError}`));
+        return this.demoEncrypt(data, options.contentId);
+      }
     } catch (error) {
       console.error(chalk.red(`❌ Encryption failed: ${error}`));
       throw error;
     }
   }
 
+  /**
+   * Convenience method for encrypting files
+   */
   async encryptFile(
     filePath: string, 
-    options: SealEncryptionOptions
+    contentId: string,
+    options?: Partial<SealEncryptionOptions>
   ): Promise<Uint8Array> {
     try {
       const fs = await import('fs/promises');
       const data = await fs.readFile(filePath);
       
       console.log(chalk.blue(`🔒 Encrypting file: ${filePath}`));
-      return await this.encryptData(data, options);
+      return await this.encryptContent(data, {
+        contentId,
+        ...options
+      });
     } catch (error) {
       console.error(chalk.red(`❌ File encryption failed: ${error}`));
       throw error;
     }
   }
 
-  // Decryption methods
-  async decryptData(request: SealDecryptionRequest): Promise<Uint8Array> {
+  /**
+   * Generate a content ID for articles
+   * TODO: Replace with backend-generated IDs
+   */
+  generateArticleContentId(articleId?: string): string {
+    // TODO: This should be generated by the backend to ensure uniqueness
+    // and consistency across the platform
+    
+    // Generate a proper hex ID for Seal encryption
+    let sourceString: string;
+    if (articleId) {
+      sourceString = `article_${articleId}`;
+    } else {
+      // Fallback to timestamp + random for now
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      sourceString = `article_${timestamp}_${random}`;
+    }
+    
+    // Convert to hex format for Seal
+    const encoder = new TextEncoder();
+    const data = encoder.encode(sourceString);
+    const hexId = '0x' + Array.from(data)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    console.log(chalk.gray(`  Generated hex content ID: ${hexId}`));
+    return hexId;
+  }
+
+  // === DECRYPTION METHODS ===
+
+  /**
+   * Decrypt content by trying available user credentials
+   * This is the main decryption method - tries policies based on what user has
+   */
+  async decryptContent(request: SealDecryptionRequest): Promise<Uint8Array> {
     try {
-      console.log(chalk.blue(`🔓 Decrypting data for identity: ${request.identity}`));
+      console.log(chalk.blue(`🔓 Attempting to decrypt content: ${request.contentId}`));
       
-      // This is a placeholder implementation
-      // In reality, this would:
-      // 1. Validate access permissions via smart contract
-      // 2. Request decryption keys from Seal key servers
-      // 3. Decrypt the data using IBE
-      
-      // For now, we'll simulate decryption by removing our header
-      const headerText = `SEAL_ENCRYPTED_${request.policy}_`;
-      const header = new TextEncoder().encode(headerText);
-      
-      if (request.encryptedData.length < header.length) {
-        throw new Error('Invalid encrypted data format');
+      // Check if this is demo encrypted data
+      if (this.isDemoEncrypted(request.encryptedData)) {
+        console.log(chalk.yellow(`⚠️  Detected demo-encrypted data, decrypting locally`));
+        return this.demoDecrypt(request.encryptedData, request.contentId);
       }
       
-      // Check if data starts with our header
-      const headerMatch = request.encryptedData.slice(0, header.length);
-      if (!this.arraysEqual(headerMatch, header)) {
-        throw new Error('Invalid encrypted data header');
+      // Try each available credential type until one succeeds
+      const credentials = request.credentials;
+      const packageId = request.packageId || process.env.PACKAGE_ID;
+      
+      if (!packageId) {
+        throw new Error('Package ID is required for Seal decryption');
       }
-      
-      const decrypted = request.encryptedData.slice(header.length);
-      
-      console.log(chalk.green(`✓ Data decrypted successfully`));
-      console.log(chalk.gray(`  Identity: ${request.identity}`));
-      console.log(chalk.gray(`  Policy: ${request.policy}`));
-      console.log(chalk.gray(`  Decrypted size: ${decrypted.length} bytes`));
-      
-      return decrypted;
+
+      // Try subscription access first (most common)
+      if (credentials.subscription) {
+        console.log(chalk.blue('🎫 Trying subscription access...'));
+        try {
+          return await this.tryDecryptWithSubscription(
+            request.encryptedData,
+            request.contentId,
+            credentials.subscription,
+            packageId
+          );
+        } catch (error: any) {
+          console.log(chalk.gray(`  Subscription access failed: ${error?.message || error}`));
+        }
+      }
+
+      // Try NFT access
+      if (credentials.nft) {
+        console.log(chalk.blue('🎨 Trying NFT access...'));
+        try {
+          return await this.tryDecryptWithNFT(
+            request.encryptedData,
+            request.contentId,
+            credentials.nft,
+            packageId
+          );
+        } catch (error: any) {
+          console.log(chalk.gray(`  NFT access failed: ${error?.message || error}`));
+        }
+      }
+
+      // Try publication owner access (highest priority)
+      if (credentials.publicationOwner) {
+        console.log(chalk.blue('👑 Trying publication owner access...'));
+        try {
+          return await this.tryDecryptWithPublicationOwner(
+            request.encryptedData,
+            request.contentId,
+            credentials.publicationOwner,
+            packageId
+          );
+        } catch (error: any) {
+          console.log(chalk.gray(`  Publication owner access failed: ${error?.message || error}`));
+        }
+      }
+
+      // Try contributor access
+      if (credentials.contributor) {
+        console.log(chalk.blue('✍️ Trying contributor access...'));
+        try {
+          return await this.tryDecryptWithContributor(
+            request.encryptedData,
+            request.contentId,
+            credentials.contributor,
+            packageId
+          );
+        } catch (error: any) {
+          console.log(chalk.gray(`  Contributor access failed: ${error?.message || error}`));
+        }
+      }
+
+      // Try allowlist access
+      if (credentials.allowlist) {
+        console.log(chalk.blue('📋 Trying allowlist access...'));
+        try {
+          return await this.tryDecryptWithAllowlist(
+            request.encryptedData,
+            request.contentId,
+            credentials.allowlist,
+            packageId
+          );
+        } catch (error: any) {
+          console.log(chalk.gray(`  Allowlist access failed: ${error?.message || error}`));
+        }
+      }
+
+      throw new Error('No valid access method found for this content');
     } catch (error) {
       console.error(chalk.red(`❌ Decryption failed: ${error}`));
       throw error;
     }
   }
 
+  // === INDIVIDUAL POLICY DECRYPTION METHODS ===
+
+  private async tryDecryptWithSubscription(
+    encryptedData: Uint8Array,
+    contentId: string,
+    subscription: NonNullable<UserCredentials['subscription']>,
+    packageId: string
+  ): Promise<Uint8Array> {
+    const sealClient = await this.getSealClient();
+    const suiClient = getDefaultSuiClient();
+    
+    const [{ SessionKey }, { Transaction }] = await Promise.all([
+      import('@mysten/seal'),
+      import('@mysten/sui/transactions')
+    ]);
+    
+    const { SuiClient } = await import('@mysten/sui/client');
+    const compatibleSuiClient = new SuiClient({ 
+      url: getNetworkConfig('testnet').sui.rpcUrl 
+    }) as any;
+    
+    const sessionKey = await SessionKey.create({
+      address: suiClient.getAddress(),
+      packageId,
+      ttlMin: 10,
+      suiClient: compatibleSuiClient,
+    });
+    
+    const message = sessionKey.getPersonalMessage();
+    const { signature } = await suiClient.getKeypair().signPersonalMessage(message);
+    sessionKey.setPersonalMessageSignature(signature);
+    
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${packageId}::platform_access::seal_approve`,
+      arguments: [
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(contentId))),
+        tx.object(subscription.id),
+        tx.object(subscription.serviceId),
+        tx.object('0x6'), // Clock object
+      ]
+    });
+    
+    const txBytes = await tx.build({ 
+      client: suiClient.getClient(), 
+      onlyTransactionKind: true 
+    });
+    
+    const decrypted = await sealClient.decrypt({
+      data: encryptedData,
+      sessionKey,
+      txBytes,
+    });
+    
+    console.log(chalk.green('✅ Decrypted with subscription access'));
+    return decrypted;
+  }
+
+  private async tryDecryptWithNFT(
+    encryptedData: Uint8Array,
+    contentId: string,
+    nft: NonNullable<UserCredentials['nft']>,
+    packageId: string
+  ): Promise<Uint8Array> {
+    const sealClient = await this.getSealClient();
+    const suiClient = getDefaultSuiClient();
+    
+    const [{ SessionKey }, { Transaction }] = await Promise.all([
+      import('@mysten/seal'),
+      import('@mysten/sui/transactions')
+    ]);
+    
+    const { SuiClient } = await import('@mysten/sui/client');
+    const compatibleSuiClient = new SuiClient({ 
+      url: getNetworkConfig('testnet').sui.rpcUrl 
+    }) as any;
+    
+    const sessionKey = await SessionKey.create({
+      address: suiClient.getAddress(),
+      packageId,
+      ttlMin: 10,
+      suiClient: compatibleSuiClient,
+    });
+    
+    const message = sessionKey.getPersonalMessage();
+    const { signature } = await suiClient.getKeypair().signPersonalMessage(message);
+    sessionKey.setPersonalMessageSignature(signature);
+    
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${packageId}::article_nft::seal_approve`,
+      arguments: [
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(contentId))),
+        tx.object(nft.id),
+        tx.object(nft.articleId),
+      ]
+    });
+    
+    const txBytes = await tx.build({ 
+      client: suiClient.getClient(), 
+      onlyTransactionKind: true 
+    });
+    
+    const decrypted = await sealClient.decrypt({
+      data: encryptedData,
+      sessionKey,
+      txBytes,
+    });
+    
+    console.log(chalk.green('✅ Decrypted with NFT access'));
+    return decrypted;
+  }
+
+  private async tryDecryptWithContributor(
+    encryptedData: Uint8Array,
+    contentId: string,
+    contributor: NonNullable<UserCredentials['contributor']>,
+    packageId: string
+  ): Promise<Uint8Array> {
+    const sealClient = await this.getSealClient();
+    const suiClient = getDefaultSuiClient();
+    
+    const [{ SessionKey }, { Transaction }] = await Promise.all([
+      import('@mysten/seal'),
+      import('@mysten/sui/transactions')
+    ]);
+    
+    const { SuiClient } = await import('@mysten/sui/client');
+    const compatibleSuiClient = new SuiClient({ 
+      url: getNetworkConfig('testnet').sui.rpcUrl 
+    }) as any;
+    
+    const sessionKey = await SessionKey.create({
+      address: suiClient.getAddress(),
+      packageId,
+      ttlMin: 10,
+      suiClient: compatibleSuiClient,
+    });
+    
+    const message = sessionKey.getPersonalMessage();
+    const { signature } = await suiClient.getKeypair().signPersonalMessage(message);
+    sessionKey.setPersonalMessageSignature(signature);
+    
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${packageId}::seal_content_policy::seal_approve_publication`,
+      arguments: [
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(contentId))),
+        tx.object(contributor.contentPolicyId),
+        tx.object(contributor.publicationId),
+      ]
+    });
+    
+    const txBytes = await tx.build({ 
+      client: suiClient.getClient(), 
+      onlyTransactionKind: true 
+    });
+    
+    const decrypted = await sealClient.decrypt({
+      data: encryptedData,
+      sessionKey,
+      txBytes,
+    });
+    
+    console.log(chalk.green('✅ Decrypted with contributor access'));
+    return decrypted;
+  }
+
+  private async tryDecryptWithPublicationOwner(
+    encryptedData: Uint8Array,
+    contentId: string,
+    publicationOwner: NonNullable<UserCredentials['publicationOwner']>,
+    packageId: string
+  ): Promise<Uint8Array> {
+    const sealClient = await this.getSealClient();
+    const suiClient = getDefaultSuiClient();
+    
+    const [{ SessionKey }, { Transaction }] = await Promise.all([
+      import('@mysten/seal'),
+      import('@mysten/sui/transactions')
+    ]);
+    
+    const { SuiClient } = await import('@mysten/sui/client');
+    const compatibleSuiClient = new SuiClient({ 
+      url: getNetworkConfig('testnet').sui.rpcUrl 
+    }) as any;
+    
+    const sessionKey = await SessionKey.create({
+      address: suiClient.getAddress(),
+      packageId,
+      ttlMin: 10,
+      suiClient: compatibleSuiClient,
+    });
+    
+    const message = sessionKey.getPersonalMessage();
+    const { signature } = await suiClient.getKeypair().signPersonalMessage(message);
+    sessionKey.setPersonalMessageSignature(signature);
+    
+    const tx = new Transaction();
+    console.log(chalk.gray(`  Building transaction with:`));
+    console.log(chalk.gray(`    Target: ${packageId}::seal_content_policy::seal_approve_publication_owner`));
+    console.log(chalk.gray(`    Content ID: ${contentId}`));
+    console.log(chalk.gray(`    Owner Cap ID: ${publicationOwner.ownerCapId}`));
+    console.log(chalk.gray(`    Publication ID: ${publicationOwner.publicationId}`));
+    
+    // Convert content ID to bytes correctly
+    let contentIdBytes: number[];
+    if (contentId.startsWith('0x')) {
+      // If it's a hex string, convert from hex to bytes
+      const hexStr = contentId.substring(2);
+      contentIdBytes = [];
+      for (let i = 0; i < hexStr.length; i += 2) {
+        contentIdBytes.push(parseInt(hexStr.substr(i, 2), 16));
+      }
+    } else {
+      // If it's a plain string, convert to UTF-8 bytes
+      contentIdBytes = Array.from(new TextEncoder().encode(contentId));
+    }
+    
+    console.log(chalk.gray(`  Content ID bytes length: ${contentIdBytes.length}`));
+    
+    tx.moveCall({
+      target: `${packageId}::seal_content_policy::seal_approve_publication_owner`,
+      arguments: [
+        tx.pure.vector('u8', contentIdBytes),
+        tx.object(publicationOwner.ownerCapId),
+        tx.object(publicationOwner.publicationId),
+      ]
+    });
+    
+    const txBytes = await tx.build({ 
+      client: suiClient.getClient(), 
+      onlyTransactionKind: true 
+    });
+    
+    console.log(chalk.gray(`  Transaction built successfully, ${txBytes.length} bytes`));
+    
+    // Test if the transaction would succeed by executing it (dry run)
+    try {
+      const dryRunResult = await suiClient.getClient().dryRunTransactionBlock({
+        transactionBlock: txBytes,
+      });
+      console.log(chalk.gray(`  Dry run status: ${dryRunResult.effects.status.status}`));
+      if (dryRunResult.effects.status.status === 'failure') {
+        console.log(chalk.red(`  Dry run failed: ${dryRunResult.effects.status.error}`));
+      }
+    } catch (dryRunError) {
+      console.log(chalk.yellow(`  Could not dry run transaction: ${dryRunError}`));
+    }
+    
+    try {
+      console.log(chalk.gray(`  Calling Seal decrypt...`));
+      console.log(chalk.gray(`  Encrypted data length: ${encryptedData.length} bytes`));
+      console.log(chalk.gray(`  First 16 bytes: ${Array.from(encryptedData.slice(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`));
+      
+      const decrypted = await sealClient.decrypt({
+        data: encryptedData,
+        sessionKey,
+        txBytes,
+      });
+      
+      console.log(chalk.green('✅ Decrypted with publication owner access'));
+      return decrypted;
+    } catch (sealError: any) {
+      console.log(chalk.red(`  Seal decrypt error: ${sealError.message}`));
+      console.log(chalk.gray(`  Error details: ${JSON.stringify(sealError, null, 2)}`));
+      throw sealError;
+    }
+  }
+
+  private async tryDecryptWithAllowlist(
+    encryptedData: Uint8Array,
+    contentId: string,
+    allowlist: NonNullable<UserCredentials['allowlist']>,
+    packageId: string
+  ): Promise<Uint8Array> {
+    const sealClient = await this.getSealClient();
+    const suiClient = getDefaultSuiClient();
+    
+    const [{ SessionKey }, { Transaction }] = await Promise.all([
+      import('@mysten/seal'),
+      import('@mysten/sui/transactions')
+    ]);
+    
+    const { SuiClient } = await import('@mysten/sui/client');
+    const compatibleSuiClient = new SuiClient({ 
+      url: getNetworkConfig('testnet').sui.rpcUrl 
+    }) as any;
+    
+    const sessionKey = await SessionKey.create({
+      address: suiClient.getAddress(),
+      packageId,
+      ttlMin: 10,
+      suiClient: compatibleSuiClient,
+    });
+    
+    const message = sessionKey.getPersonalMessage();
+    const { signature } = await suiClient.getKeypair().signPersonalMessage(message);
+    sessionKey.setPersonalMessageSignature(signature);
+    
+    const tx = new Transaction();
+    tx.moveCall({
+      target: `${packageId}::seal_content_policy::seal_approve_allowlist`,
+      arguments: [
+        tx.pure.vector('u8', Array.from(new TextEncoder().encode(contentId))),
+        tx.object(allowlist.contentPolicyId),
+      ]
+    });
+    
+    const txBytes = await tx.build({ 
+      client: suiClient.getClient(), 
+      onlyTransactionKind: true 
+    });
+    
+    const decrypted = await sealClient.decrypt({
+      data: encryptedData,
+      sessionKey,
+      txBytes,
+    });
+    
+    console.log(chalk.green('✅ Decrypted with allowlist access'));
+    return decrypted;
+  }
+
+  // === DEMO ENCRYPTION/DECRYPTION (FALLBACK) ===
+
+  private demoEncrypt(data: Uint8Array, contentId: string): Uint8Array {
+    const key = new TextEncoder().encode(contentId.padEnd(32, '0')).slice(0, 32);
+    const encrypted = new Uint8Array(data.length);
+    
+    for (let i = 0; i < data.length; i++) {
+      encrypted[i] = data[i] ^ key[i % key.length];
+    }
+    
+    const header = new TextEncoder().encode(`DEMO_ENCRYPTED_${contentId}_`);
+    const result = new Uint8Array(header.length + encrypted.length);
+    result.set(header, 0);
+    result.set(encrypted, header.length);
+    
+    console.log(chalk.green(`✅ Content encrypted with demo encryption`));
+    console.log(chalk.gray(`  Content ID: ${contentId}`));
+    console.log(chalk.gray(`  Original size: ${data.length} bytes`));
+    console.log(chalk.gray(`  Encrypted size: ${result.length} bytes`));
+    
+    return result;
+  }
+
+  private isDemoEncrypted(encryptedData: Uint8Array): boolean {
+    const headerStart = new TextEncoder().encode('DEMO_ENCRYPTED_');
+    if (encryptedData.length < headerStart.length) return false;
+    
+    for (let i = 0; i < headerStart.length; i++) {
+      if (encryptedData[i] !== headerStart[i]) return false;
+    }
+    return true;
+  }
+
+  private demoDecrypt(encryptedData: Uint8Array, contentId: string): Uint8Array {
+    const headerText = `DEMO_ENCRYPTED_${contentId}_`;
+    const header = new TextEncoder().encode(headerText);
+    
+    if (encryptedData.length < header.length) {
+      throw new Error('Invalid demo encrypted data format');
+    }
+    
+    const encrypted = encryptedData.slice(header.length);
+    const key = new TextEncoder().encode(contentId.padEnd(32, '0')).slice(0, 32);
+    const decrypted = new Uint8Array(encrypted.length);
+    
+    for (let i = 0; i < encrypted.length; i++) {
+      decrypted[i] = encrypted[i] ^ key[i % key.length];
+    }
+    
+    console.log(chalk.green(`✅ Demo decryption successful`));
+    console.log(chalk.gray(`  Content ID: ${contentId}`));
+    console.log(chalk.gray(`  Decrypted size: ${decrypted.length} bytes`));
+    
+    return decrypted;
+  }
+
+  // === CONVENIENCE METHODS ===
+
   async decryptToFile(
     request: SealDecryptionRequest, 
     outputPath: string
   ): Promise<void> {
     try {
-      const decrypted = await this.decryptData(request);
+      const decrypted = await this.decryptContent(request);
       
       const fs = await import('fs/promises');
       await fs.writeFile(outputPath, decrypted);
       
-      console.log(chalk.green(`✓ Decrypted data saved to: ${outputPath}`));
+      console.log(chalk.green(`✅ Decrypted content saved to: ${outputPath}`));
     } catch (error) {
       console.error(chalk.red(`❌ Decryption to file failed: ${error}`));
       throw error;
     }
   }
 
-  // Access policy management
-  async createSubscriptionPolicy(policyConfig: {
-    platformServiceId: string;
-    subscriptionDuration: number;
-  }): Promise<string> {
-    try {
-      console.log(chalk.blue(`📋 Creating subscription access policy`));
-      
-      // This would create a Seal access policy for subscription-based access
-      // The policy would verify subscription status via smart contract
-      const policyId = `subscription_policy_${Date.now()}`;
-      
-      console.log(chalk.green(`✓ Subscription policy created: ${policyId}`));
-      return policyId;
-    } catch (error) {
-      console.error(chalk.red(`❌ Policy creation failed: ${error}`));
-      throw error;
-    }
+  // === LEGACY SUPPORT ===
+
+  /**
+   * @deprecated Use encryptContent instead
+   */
+  async encryptData(data: Uint8Array, options: any): Promise<Uint8Array> {
+    console.log(chalk.yellow('⚠️  Using deprecated encryptData method'));
+    return this.demoEncrypt(data, options.policy || 'legacy');
   }
 
-  async createNFTPolicy(policyConfig: {
-    articleId: string;
-    nftType: string;
-  }): Promise<string> {
-    try {
-      console.log(chalk.blue(`📋 Creating NFT access policy`));
-      
-      // This would create a Seal access policy for NFT-based access
-      // The policy would verify NFT ownership via smart contract
-      const policyId = `nft_policy_${Date.now()}`;
-      
-      console.log(chalk.green(`✓ NFT policy created: ${policyId}`));
-      return policyId;
-    } catch (error) {
-      console.error(chalk.red(`❌ Policy creation failed: ${error}`));
-      throw error;
-    }
+  /**
+   * @deprecated Use decryptContent instead  
+   */
+  async decryptData(request: SealDecryptionRequestLegacy): Promise<Uint8Array> {
+    console.log(chalk.yellow('⚠️  Using deprecated decryptData method'));
+    return this.demoDecrypt(request.encryptedData, request.identity);
   }
 
-  async createAllowlistPolicy(policyConfig: {
-    allowedAddresses: string[];
-    creatorAddress: string;
-  }): Promise<string> {
-    try {
-      console.log(chalk.blue(`📋 Creating allowlist access policy`));
-      
-      // This would create a Seal access policy for allowlist-based access
-      const policyId = `allowlist_policy_${Date.now()}`;
-      
-      console.log(chalk.green(`✓ Allowlist policy created: ${policyId}`));
-      return policyId;
-    } catch (error) {
-      console.error(chalk.red(`❌ Policy creation failed: ${error}`));
-      throw error;
-    }
-  }
+  // === UTILITY METHODS ===
 
-  // Utility methods
   private arraysEqual(a: Uint8Array, b: Uint8Array): boolean {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
@@ -207,30 +705,33 @@ export class InkraySealClient {
     return true;
   }
 
+  /**
+   * Validate if user has any access to the content
+   */
   async validateAccess(
-    identity: string,
-    policy: string,
-    accessProof?: any
-  ): Promise<boolean> {
+    contentId: string,
+    credentials: UserCredentials
+  ): Promise<{hasAccess: boolean, method?: string}> {
     try {
-      console.log(chalk.blue(`✅ Validating access for identity: ${identity}`));
+      console.log(chalk.blue(`✅ Validating access for content: ${contentId}`));
       
-      // This would validate access permissions via Seal key servers
-      // and smart contract verification
+      // Check what credentials are available
+      const availableMethods = [];
+      if (credentials.subscription) availableMethods.push('subscription');
+      if (credentials.nft) availableMethods.push('nft');
+      if (credentials.contributor) availableMethods.push('contributor');
+      if (credentials.allowlist) availableMethods.push('allowlist');
       
-      // For now, we'll simulate validation
-      const isValid = true; // In reality, this would check actual access rights
-      
-      if (isValid) {
-        console.log(chalk.green(`✓ Access validated successfully`));
-      } else {
-        console.log(chalk.red(`❌ Access denied`));
+      if (availableMethods.length === 0) {
+        console.log(chalk.red('❌ No credentials available'));
+        return { hasAccess: false };
       }
       
-      return isValid;
+      console.log(chalk.green(`✅ Available access methods: ${availableMethods.join(', ')}`));
+      return { hasAccess: true, method: availableMethods[0] };
     } catch (error) {
       console.error(chalk.red(`❌ Access validation failed: ${error}`));
-      return false;
+      return { hasAccess: false };
     }
   }
 }

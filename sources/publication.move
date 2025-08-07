@@ -2,6 +2,7 @@ module contracts::publication {
     use sui::vec_set::{Self, VecSet};
     use sui::event;
     use std::string::String;
+    use contracts::publication_vault;
 
     // === Errors ===
     const ENotOwner: u64 = 0;
@@ -44,6 +45,21 @@ module contracts::publication {
     }
 
     // === Public Functions ===
+    
+    /// Create a publication with its associated vault
+    public fun create_publication_with_vault<B: store>(
+        name: String,
+        description: String,
+        ctx: &mut TxContext
+    ): (Publication, PublicationOwnerCap) {
+        // Create vault first
+        let vault_id = publication_vault::create_vault<B>(1000, ctx); // Default batch size
+        
+        // Create publication with vault_id
+        create_publication(name, description, vault_id, ctx)
+    }
+    
+    /// Create publication with existing vault ID (for advanced use cases)
     public fun create_publication(
         name: String,
         description: String,

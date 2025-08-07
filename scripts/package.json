@@ -21,7 +21,8 @@
     "mint-nft": "tsx src/interactions/nft.ts",
     "demo:creator": "tsx src/examples/creator-journey.ts",
     "demo:reader": "tsx src/examples/reader-journey.ts",
-    "demo:platform": "tsx src/examples/full-platform.ts"
+    "demo:platform": "tsx src/examples/full-platform.ts",
+    "test:seal": "tsx src/simple-decrypt-test.ts"
   },
   "keywords": [
     "sui",
@@ -59,7 +60,8 @@
     "jest": "^29.7.0",
     "prettier": "^3.1.1",
     "tsx": "^4.6.2",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "undici": "^7.13.0"
   },
   "engines": {
     "node": ">=18.0.0"

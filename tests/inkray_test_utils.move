@@ -182,7 +182,6 @@ module contracts::inkray_test_utils {
 
             // Create shared vault - now creates and shares automatically  
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication),
                 10, // batch size
                 test_scenario::ctx(scenario)
             );

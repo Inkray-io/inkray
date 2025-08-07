@@ -208,11 +208,11 @@ export class WalrusUploadManager {
     const blobObject = uploadResponse.blobObject;
     
     return {
-      blobId: blobObject.blobId,
+      blobId: uploadResponse.blobId, // Use the top-level blobId
       blobObjectId: blobObject.id,
-      size: blobObject.size,
-      storageEndEpoch: blobObject.storageEndEpoch,
-      uploadUrl: `walrus://${blobObject.blobId}`,
+      size: parseInt(blobObject.size), // Convert string to number
+      storageEndEpoch: blobObject.storage?.end_epoch || 0,
+      uploadUrl: `walrus://${uploadResponse.blobId}`,
     };
   }
 
@@ -327,4 +327,8 @@ export async function uploadText(text: string, fileName: string, options?: Uploa
 
 export async function uploadJSON(data: any, fileName: string, options?: UploadOptions): Promise<UploadResult> {
   return await getDefaultUploadManager().uploadJSON(data, fileName, options);
+}
+
+export async function uploadBuffer(buffer: Uint8Array, fileName: string, options?: UploadOptions): Promise<UploadResult> {
+  return await getDefaultUploadManager().uploadBuffer(buffer, fileName, options);
 }

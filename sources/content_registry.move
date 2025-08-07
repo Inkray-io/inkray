@@ -70,10 +70,9 @@ module contracts::content_registry {
             created_at,
         };
 
-        // Store blob in vault
+        // Store blob in vault (authorization already checked above)
         publication_vault::store_blob<B>(
             vault, 
-            publication,
             blob_id,
             blob,
             is_paid, // is_encrypted matches is_paid

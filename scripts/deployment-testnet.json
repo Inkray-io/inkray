@@ -1,12 +1,12 @@
 {
   "network": "testnet",
-  "deployedAt": "2025-08-06T11:30:38.776Z",
-  "packageId": "0xbeff387ed0e6f0665dce27b8ebf73b1c06ee96d23723ce3866d6065e49c21dea",
+  "deployedAt": "2025-08-07T13:11:08.341Z",
+  "packageId": "0xa462e6057d02479109cab6e926b12a61f3dd9a459a2f79206ea42f52dde4ac2a",
   "sharedObjects": {
-    "PLATFORM_TREASURY_ID": "0xce9683d5a844a5e898d07ce38fb3999691b1855c732bb184229ef9425ea6c2b3",
-    "MINT_CONFIG_ID": "0xf59971b952534356cc3c6baca0b7550e93d8212c9487ecfa25f18512e6fbe3df",
-    "PLATFORM_SERVICE_ID": "0xf5bea48797d50eeab41b357db6abf9d55c532c185f2368c57b0b42fb6cbbb790"
+    "MINT_CONFIG_ID": "0x7e8901e083fab44780c08ae5c0b0c38409e103bd25857922b12cd83ab64fa14f",
+    "PLATFORM_SERVICE_ID": "0xd6f8890bf47587fb7f1089b6861998bafd2b128b91a32f39d002f759f2d69c71",
+    "PLATFORM_TREASURY_ID": "0xe7f3338fccbc6b151dc32fad3332eee467a8d583750873afb46333d9725f7fe1"
   },
-  "upgradeCapId": "0x2524a86edf1a476464587ddd93c72ca8d3f6d26073e7aa6f64e4d3cb88ae6a58",
-  "deployer": "0x1ce895f610a98ee14452d4c49ee4bb1a36d2b4a88f6c6e5a6e137a582a23c26a"
+  "upgradeCapId": "0x57c3bbf2188058b1a4ae0abdb4357fc72dbbb5ec99f64ffddfec169c3f21e8d8",
+  "deployer": "0xeddad3411dccd567a164f1c8f9bc91ec414509956bb643e509336149fb43c7c1"
 }

@@ -222,15 +222,38 @@ module contracts::platform_access {
     // === Seal Approval Functions ===
     // These functions are called by Seal to verify access to encrypted content
 
-    public fun seal_approve_platform_subscription(
-        _identity: vector<u8>,
+    entry fun seal_approve(
+        id: vector<u8>,
         subscription: &PlatformSubscription,
+        service: &PlatformService,
         clock: &Clock,
         ctx: &TxContext
     ) {
+        assert!(approve_internal(id, subscription, service, clock, ctx), ESubscriptionExpired);
+    }
+
+    fun approve_internal(
+        _id: vector<u8>,
+        subscription: &PlatformSubscription,
+        _service: &PlatformService,
+        clock: &Clock,
+        ctx: &TxContext
+    ): bool {
+        // Note: PlatformSubscription doesn't track which service it belongs to
+        // In a production system, you might want to add a service_id field to PlatformSubscription
+        
         let current_time = clock::timestamp_ms(clock);
-        assert!(current_time < subscription.expires_at, ESubscriptionExpired);
-        assert!(subscription.subscriber == tx_context::sender(ctx), ENotSubscriber);
+        // Check subscription is still active
+        if (current_time >= subscription.expires_at) {
+            return false
+        };
+        
+        // Check subscriber matches transaction sender
+        if (subscription.subscriber != tx_context::sender(ctx)) {
+            return false
+        };
+        
+        true
     }
 
     // === View Functions ===

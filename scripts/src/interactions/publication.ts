@@ -28,26 +28,37 @@ export class PublicationManager {
         throw new Error('Package ID not found. Please deploy contracts first.');
       }
 
-      // Create temporary vault ID if not provided (using placeholder like in tests)
-      const vaultId = params.vaultId || '0x0000000000000000000000000000000000000000000000000000000000000001';
-
       const result = await executeTransaction(async (tx) => {
-        // Call create_publication function
-        const [publication, ownerCap] = tx.moveCall({
-          package: packageId,
-          module: MODULES.PUBLICATION,
-          function: FUNCTIONS.CREATE_PUBLICATION,
-          arguments: [
-            tx.pureString(params.name),
-            tx.pureString(params.description),
-            tx.pure(vaultId, 'address'),
-          ],
-        });
+        let publication, ownerCap;
+        
+        if (params.vaultId) {
+          // Use existing vault ID
+          [publication, ownerCap] = tx.moveCall({
+            package: packageId,
+            module: MODULES.PUBLICATION,
+            function: FUNCTIONS.CREATE_PUBLICATION,
+            arguments: [
+              tx.pureString(params.name),
+              tx.pureString(params.description),
+              tx.pure(params.vaultId, 'address'),
+            ],
+          });
+        } else {
+          // Create publication with vault - using real Walrus Blob type on testnet
+          [publication, ownerCap] = tx.moveCall({
+            package: packageId,
+            module: MODULES.PUBLICATION,
+            function: 'create_publication_with_vault',
+            typeArguments: [`0xd84704c17fc870b8764832c535aa6b11f21a95cd6f5bb38a9b07d2cf42220c66::blob::Blob`],
+            arguments: [
+              tx.pureString(params.name),
+              tx.pureString(params.description),
+            ],
+          });
+        }
 
         // Transfer publication and owner cap to sender
         tx.transferObjects([publication, ownerCap], tx.client.getAddress());
-
-        return { publication, ownerCap };
       });
 
       // Extract created objects from transaction result
@@ -59,6 +70,9 @@ export class PublicationManager {
       const ownerCapChange = createdObjects.find(obj => 
         (obj as any).objectType?.includes('PublicationOwnerCap')
       );
+      const vaultChange = createdObjects.find(obj => 
+        (obj as any).objectType?.includes('PublicationVault')
+      );
 
       if (!publicationChange || !ownerCapChange) {
         throw new Error('Failed to create publication objects');
@@ -69,7 +83,7 @@ export class PublicationManager {
         name: params.name,
         description: params.description,
         owner: this.client.getAddress(),
-        vault_id: vaultId,
+        vault_id: vaultChange ? (vaultChange as any).objectId : (params.vaultId || 'no_vault_created'),
         contributors: [],
       };
 

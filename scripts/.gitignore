@@ -48,3 +48,6 @@ keys/
 test-files/
 uploads/
 downloads/
+
+test_file
+src/simple-decrypt-test.ts

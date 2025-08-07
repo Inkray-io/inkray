@@ -29,7 +29,7 @@ module contracts::vault_blob_tests {
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 
@@ -39,7 +39,7 @@ module contracts::vault_blob_tests {
             let blob_id = 1u256;
             let blob = mock_blob::new(blob_id, 1024, test_scenario::ctx(&mut scenario));
 
-            publication_vault::store_blob(&mut vault, &publication, blob_id, blob, false, test_scenario::ctx(&mut scenario));
+            publication_vault::store_blob(&mut vault, blob_id, blob, false, test_scenario::ctx(&mut scenario));
 
             assert!(publication_vault::has_blob(&vault, blob_id));
             let retrieved_blob = publication_vault::get_blob(&vault, blob_id);
@@ -61,7 +61,7 @@ module contracts::vault_blob_tests {
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 
@@ -71,10 +71,10 @@ module contracts::vault_blob_tests {
             let blob_id = 1u256;
             let blob = mock_blob::new(blob_id, 1024, test_scenario::ctx(&mut scenario));
 
-            publication_vault::store_blob(&mut vault, &publication, blob_id, blob, false, test_scenario::ctx(&mut scenario));
+            publication_vault::store_blob(&mut vault, blob_id, blob, false, test_scenario::ctx(&mut scenario));
             assert!(publication_vault::has_blob(&vault, blob_id));
 
-            let removed_blob = publication_vault::remove_blob<MockBlob>(&mut vault, &publication, blob_id, test_scenario::ctx(&mut scenario));
+            let removed_blob = publication_vault::remove_blob<MockBlob>(&mut vault, blob_id, test_scenario::ctx(&mut scenario));
             mock_blob::size(&removed_blob); // Consume the blob
 
             assert!(!publication_vault::has_blob(&vault, blob_id));
@@ -86,16 +86,15 @@ module contracts::vault_blob_tests {
         test_utils::end_scenario(scenario);
     }
 
-    /// Test that an unauthorized user cannot remove a blob.
+    /// Test that vault-level operations don't check authorization (handled at higher level).
     #[test]
-    #[expected_failure(abort_code = contracts::publication_vault::ENotAuthorized)]
     fun test_remove_blob_unauthorized() {
         let (mut scenario, publication, owner_cap) = setup_scenario(test_utils::creator());
 
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 
@@ -105,14 +104,15 @@ module contracts::vault_blob_tests {
             let blob_id = 1u256;
             let blob = mock_blob::new(blob_id, 1024, test_scenario::ctx(&mut scenario));
 
-            publication_vault::store_blob(&mut vault, &publication, blob_id, blob, false, test_scenario::ctx(&mut scenario));
+            publication_vault::store_blob(&mut vault, blob_id, blob, false, test_scenario::ctx(&mut scenario));
             test_utils::return_shared(vault);
         };
 
         test_utils::next_tx(&mut scenario, test_utils::contributor());
         {
             let mut vault = test_utils::take_shared<PublicationVault<MockBlob>>(&scenario);
-            publication_vault::remove_blob<MockBlob>(&mut vault, &publication, 1u256, test_scenario::ctx(&mut scenario));
+            // This now succeeds since authorization is handled at content_registry level
+            let _removed_blob = publication_vault::remove_blob<MockBlob>(&mut vault, 1u256, test_scenario::ctx(&mut scenario));
             test_utils::return_shared(vault);
         };
 
@@ -129,7 +129,7 @@ module contracts::vault_blob_tests {
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 
@@ -139,7 +139,7 @@ module contracts::vault_blob_tests {
             let blob_id = 0u256;
             let blob = mock_blob::new(blob_id, 0, test_scenario::ctx(&mut scenario));
 
-            publication_vault::store_blob(&mut vault, &publication, blob_id, blob, false, test_scenario::ctx(&mut scenario));
+            publication_vault::store_blob(&mut vault, blob_id, blob, false, test_scenario::ctx(&mut scenario));
 
             assert!(publication_vault::has_blob(&vault, blob_id));
             let retrieved_blob = publication_vault::get_blob(&vault, blob_id);
@@ -161,7 +161,7 @@ module contracts::vault_blob_tests {
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 
@@ -185,14 +185,14 @@ module contracts::vault_blob_tests {
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             let mut vault = test_utils::take_shared<PublicationVault<MockBlob>>(&scenario);
-            publication_vault::remove_blob<MockBlob>(&mut vault, &publication, 123u256, test_scenario::ctx(&mut scenario)); // Should fail
+            publication_vault::remove_blob<MockBlob>(&mut vault, 123u256, test_scenario::ctx(&mut scenario)); // Should fail
             test_utils::return_shared(vault);
         };
         test_utils::return_to_sender(&scenario, publication);
@@ -209,7 +209,7 @@ module contracts::vault_blob_tests {
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             publication_vault::create_vault<MockBlob>(
-                object::id(&publication), 10, test_scenario::ctx(&mut scenario)
+                10, test_scenario::ctx(&mut scenario)
             );
         };
 
@@ -220,8 +220,8 @@ module contracts::vault_blob_tests {
             let blob1 = mock_blob::new(blob_id, 1024, test_scenario::ctx(&mut scenario));
             let blob2 = mock_blob::new(blob_id, 2048, test_scenario::ctx(&mut scenario));
 
-            publication_vault::store_blob(&mut vault, &publication, blob_id, blob1, false, test_scenario::ctx(&mut scenario));
-            publication_vault::store_blob(&mut vault, &publication, blob_id, blob2, false, test_scenario::ctx(&mut scenario)); // Should fail
+            publication_vault::store_blob(&mut vault, blob_id, blob1, false, test_scenario::ctx(&mut scenario));
+            publication_vault::store_blob(&mut vault, blob_id, blob2, false, test_scenario::ctx(&mut scenario)); // Should fail
 
             test_utils::return_shared(vault);
         };
