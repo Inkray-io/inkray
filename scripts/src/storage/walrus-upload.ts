@@ -209,7 +209,7 @@ export class WalrusUploadManager {
     
     return {
       blobId: uploadResponse.blobId, // Use the top-level blobId
-      blobObjectId: blobObject.id,
+      blobObjectId: blobObject.id.id,
       size: parseInt(blobObject.size), // Convert string to number
       storageEndEpoch: blobObject.storage?.end_epoch || 0,
       uploadUrl: `walrus://${uploadResponse.blobId}`,

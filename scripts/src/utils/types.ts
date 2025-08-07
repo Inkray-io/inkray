@@ -82,14 +82,23 @@ export interface WalrusBlob {
 }
 
 export interface WalrusUploadResponse {
+  blobId: string;
   blobObject: {
-    id: string;
-    blobId: string;
-    size: number;
-    encoding_type: string;
-    storageEndEpoch: number;
+    id: { id: string };
+    registered_epoch: number;
+    blob_id: string;
+    size: string;
+    encoding_type: number;
+    certified_epoch: number | null;
+    storage: {
+      id: { id: string };
+      start_epoch: number;
+      end_epoch: number;
+      storage_size: string;
+    } | null;
+    deletable: boolean;
   };
-  resourceOperation: {
+  resourceOperation?: {
     RegisteredFromScratch?: {
       encoded_size: number;
       epochs_ahead: number;

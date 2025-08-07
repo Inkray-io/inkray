@@ -135,7 +135,7 @@ export class InkrayWalrusClient {
       const file = files[0];
       const content = file instanceof File 
         ? await file.arrayBuffer() 
-        : new Uint8Array(await file.blob().then(b => b.arrayBuffer()));
+        : new Uint8Array(await (file as any).arrayBuffer());
 
       console.log(chalk.green(`✓ Blob downloaded successfully`));
       console.log(chalk.gray(`  Size: ${content.byteLength} bytes`));
@@ -174,7 +174,7 @@ export class InkrayWalrusClient {
 
       return {
         blobId,
-        size: file.size || 0,
+        size: (file as any).size || 0,
         storageEndEpoch: 0, // This would need to be retrieved from the blob object
       };
     } catch (error) {
@@ -204,7 +204,7 @@ export class InkrayWalrusClient {
         filePaths.map(async (filePath) => {
           const content = await fs.readFile(filePath);
           const fileName = filePath.split('/').pop() || 'file';
-          return WalrusFile.from(content, { identifier: fileName });
+          return (WalrusFile as any).from(content, fileName);
         })
       );
 
@@ -237,7 +237,7 @@ export class InkrayWalrusClient {
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const content = await file.arrayBuffer();
+        const content = await (file as any).arrayBuffer();
         results.set(blobIds[i], new Uint8Array(content));
       }
 

@@ -6,7 +6,7 @@ import chalk from 'chalk';
 
 export class TransactionBuilder {
   private tx: Transaction;
-  private client = getDefaultSuiClient();
+  public client = getDefaultSuiClient();
 
   constructor() {
     this.tx = new Transaction();
@@ -74,9 +74,7 @@ export class TransactionBuilder {
     return this.tx.pure.address(address);
   }
 
-  pureVector(type: string, values: any[]) {
-    return this.tx.pure(values, `vector<${type}>`);
-  }
+  // Note: Vector types should be handled using specific methods or manual construction
 
   // SUI coin handling
   splitCoins(coin: any, amounts: (number | string | bigint)[]) {
@@ -149,8 +147,6 @@ export class TransactionBuilder {
   // Dry run for testing
   async dryRun(): Promise<any> {
     try {
-      const keypair = this.client.getKeypair();
-      
       console.log(chalk.blue(`🧪 Dry running transaction...`));
       
       const result = await this.client.getClient().dryRunTransactionBlock({
@@ -218,7 +214,8 @@ export class CommonTransactions {
         arguments: params.arguments,
       });
       
-      tx.transferObjects([nft], tx.client.getAddress());
+      const clientAddress = getDefaultSuiClient().getAddress();
+      tx.transferObjects([nft], clientAddress);
     });
   }
 
