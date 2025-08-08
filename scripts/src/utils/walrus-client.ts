@@ -10,8 +10,9 @@ import fs from 'fs/promises';
 export class InkrayWalrusClient {
   private client: WalrusClient;
   private config: WalrusClientConfig;
+  private suiClient: import('./client.js').InkraySuiClient;
 
-  constructor(config?: Partial<WalrusClientConfig>) {
+  constructor(config?: Partial<WalrusClientConfig> & { suiClient?: import('./client.js').InkraySuiClient }) {
     const network = getCurrentNetwork();
     const networkConfig = getNetworkConfig(network);
 
@@ -21,12 +22,12 @@ export class InkrayWalrusClient {
       aggregatorUrl: config?.aggregatorUrl || networkConfig.walrus.aggregatorUrl,
     };
 
-    // Get the Sui client for Walrus operations
-    const suiClient = getDefaultSuiClient().getClient();
+    // Use provided Sui client or fall back to default
+    this.suiClient = config?.suiClient || getDefaultSuiClient();
 
     this.client = new WalrusClient({
       network: this.config.network as 'testnet' | 'mainnet',
-      suiClient,
+      suiClient: this.suiClient.getClient(),
       storageNodeClientOptions: {
         timeout: 60_000 * 2,
         fetch: (url, init) => {
@@ -62,7 +63,7 @@ export class InkrayWalrusClient {
       const fileContent = await fs.readFile(filePath);
 
       // Get signer
-      const signer = getDefaultSuiClient().getKeypair();
+      const signer = this.suiClient.getKeypair();
 
       // Upload to Walrus
       const result = await this.client.writeBlob({
@@ -95,7 +96,7 @@ export class InkrayWalrusClient {
       console.log(chalk.blue(`📤 Uploading buffer to Walrus: ${filename}`));
 
       // Try using writeBlob instead of writeFiles
-      const signer = getDefaultSuiClient().getKeypair();
+      const signer = this.suiClient.getKeypair();
 
       const result = await this.client.writeBlob({
         blob: buffer,
@@ -208,7 +209,7 @@ export class InkrayWalrusClient {
         })
       );
 
-      const signer = getDefaultSuiClient().getKeypair();
+      const signer = this.suiClient.getKeypair();
 
       const results = await this.client.writeFiles({
         files,
@@ -253,11 +254,11 @@ export class InkrayWalrusClient {
 // Singleton instance management
 let defaultWalrusClient: InkrayWalrusClient | null = null;
 
-export function createWalrusClient(config?: Partial<WalrusClientConfig>): InkrayWalrusClient {
+export function createWalrusClient(config?: Partial<WalrusClientConfig> & { suiClient?: import('./client.js').InkraySuiClient }): InkrayWalrusClient {
   return new InkrayWalrusClient(config);
 }
 
-export function getDefaultWalrusClient(config?: Partial<WalrusClientConfig>): InkrayWalrusClient {
+export function getDefaultWalrusClient(config?: Partial<WalrusClientConfig> & { suiClient?: import('./client.js').InkraySuiClient }): InkrayWalrusClient {
   if (!defaultWalrusClient) {
     defaultWalrusClient = new InkrayWalrusClient(config);
   }

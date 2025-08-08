@@ -27,6 +27,7 @@ if (typeof globalThis.crypto === 'undefined') {
 export class InkraySealClient {
   private config: SealClientConfig;
   private sealClient: SealClient | null = null;
+  private suiClient: import('./client.js').InkraySuiClient;
 
   constructor(config?: Partial<SealClientConfig>) {
     const network = getCurrentNetwork();
@@ -36,7 +37,11 @@ export class InkraySealClient {
       network: config?.network || networkConfig.seal.network,
       keyServerUrl: config?.keyServerUrl || networkConfig.seal.keyServerUrl,
       policyPackageId: config?.policyPackageId,
+      suiClient: config?.suiClient,
     };
+
+    // Use provided Sui client or fall back to default
+    this.suiClient = config?.suiClient || getDefaultSuiClient();
   }
 
   private async getSealClient(): Promise<SealClient> {
@@ -184,7 +189,12 @@ export class InkraySealClient {
       
       // Check if this is demo encrypted data
       if (this.isDemoEncrypted(request.encryptedData)) {
-        console.log(chalk.yellow(`⚠️  Detected demo-encrypted data, decrypting locally`));
+        console.log(chalk.yellow(`⚠️  Detected demo-encrypted data, validating access control...`));
+        
+        // Even in demo mode, we should validate access control
+        await this.validateAccessControl(request.credentials, request.packageId, request.requestingClient);
+        
+        console.log(chalk.green(`✅ Access control validated, decrypting demo data`));
         return this.demoDecrypt(request.encryptedData, request.contentId);
       }
       
@@ -287,7 +297,7 @@ export class InkraySealClient {
     packageId: string
   ): Promise<Uint8Array> {
     const sealClient = await this.getSealClient();
-    const suiClient = getDefaultSuiClient();
+    const suiClient = this.suiClient;
     
     const [{ SessionKey }, { Transaction }] = await Promise.all([
       import('@mysten/seal'),
@@ -343,7 +353,7 @@ export class InkraySealClient {
     packageId: string
   ): Promise<Uint8Array> {
     const sealClient = await this.getSealClient();
-    const suiClient = getDefaultSuiClient();
+    const suiClient = this.suiClient;
     
     const [{ SessionKey }, { Transaction }] = await Promise.all([
       import('@mysten/seal'),
@@ -398,7 +408,7 @@ export class InkraySealClient {
     packageId: string
   ): Promise<Uint8Array> {
     const sealClient = await this.getSealClient();
-    const suiClient = getDefaultSuiClient();
+    const suiClient = this.suiClient;
     
     const [{ SessionKey }, { Transaction }] = await Promise.all([
       import('@mysten/seal'),
@@ -453,7 +463,7 @@ export class InkraySealClient {
     packageId: string
   ): Promise<Uint8Array> {
     const sealClient = await this.getSealClient();
-    const suiClient = getDefaultSuiClient();
+    const suiClient = this.suiClient;
     
     const [{ SessionKey }, { Transaction }] = await Promise.all([
       import('@mysten/seal'),
@@ -555,7 +565,7 @@ export class InkraySealClient {
     packageId: string
   ): Promise<Uint8Array> {
     const sealClient = await this.getSealClient();
-    const suiClient = getDefaultSuiClient();
+    const suiClient = this.suiClient;
     
     const [{ SessionKey }, { Transaction }] = await Promise.all([
       import('@mysten/seal'),
@@ -633,6 +643,85 @@ export class InkraySealClient {
       if (encryptedData[i] !== headerStart[i]) return false;
     }
     return true;
+  }
+
+  /**
+   * Validate access control even in demo mode
+   */
+  private async validateAccessControl(credentials: UserCredentials, packageId?: string, requestingClient?: import('./client.js').InkraySuiClient): Promise<void> {
+    // For now, we'll do basic validation
+    // In a full implementation, this would call the smart contract to verify access
+    
+    if (!packageId) {
+      throw new Error('Package ID required for access control validation');
+    }
+
+    // Check if user has any valid credentials
+    const hasValidCredentials = !!(
+      credentials.publicationOwner || 
+      credentials.contributor || 
+      credentials.subscription || 
+      credentials.nft || 
+      credentials.allowlist
+    );
+
+    if (!hasValidCredentials) {
+      throw new Error('No valid credentials provided for access control');
+    }
+
+    // For publication owner credentials, we should validate that the user actually owns the owner cap
+    if (credentials.publicationOwner) {
+      console.log(chalk.gray('Validating publication owner access...'));
+      
+      // TODO: In a full implementation, we would:
+      // 1. Get the owner cap object from the blockchain
+      // 2. Verify that the current user actually owns that object
+      // 3. Verify that the owner cap belongs to the specified publication
+      
+      // Use the requesting client if provided, otherwise use this instance's client
+      const suiClient = requestingClient || this.suiClient;
+      const currentUserAddress = suiClient.getAddress();
+      
+      console.log(chalk.gray(`Validating access for user: ${currentUserAddress}`));
+      
+      try {
+        // Try to get the owner cap object - this will tell us if it exists and who owns it
+        const ownerCapObject = await suiClient.getObject(credentials.publicationOwner.ownerCapId);
+        
+        if (!ownerCapObject.data) {
+          throw new Error(`Owner cap object ${credentials.publicationOwner.ownerCapId} not found`);
+        }
+
+        // Check if the current user actually owns this object
+        const ownerAddress = (ownerCapObject.data as any).owner?.AddressOwner;
+        if (ownerAddress !== currentUserAddress) {
+          throw new Error(`Access denied: Current user ${currentUserAddress} does not own owner cap ${credentials.publicationOwner.ownerCapId} (owned by ${ownerAddress})`);
+        }
+
+        console.log(chalk.green('✅ Publication owner access validated'));
+        
+      } catch (error) {
+        console.log(chalk.red(`❌ Publication owner validation failed: ${error}`));
+        throw error;
+      }
+    }
+
+    // Similar validation could be added for other credential types
+    if (credentials.contributor) {
+      console.log(chalk.gray('Contributor validation not fully implemented - allowing access'));
+    }
+
+    if (credentials.subscription) {
+      console.log(chalk.gray('Subscription validation not fully implemented - allowing access'));  
+    }
+
+    if (credentials.nft) {
+      console.log(chalk.gray('NFT validation not fully implemented - allowing access'));
+    }
+
+    if (credentials.allowlist) {
+      console.log(chalk.gray('Allowlist validation not fully implemented - allowing access'));
+    }
   }
 
   private demoDecrypt(encryptedData: Uint8Array, contentId: string): Uint8Array {

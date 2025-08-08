@@ -22,6 +22,7 @@
     "demo:creator": "tsx src/examples/creator-journey.ts",
     "demo:reader": "tsx src/examples/reader-journey.ts",
     "demo:platform": "tsx src/examples/full-platform.ts",
+    "creator-contributor-workflow": "tsx src/examples/creator-contributor-workflow.ts",
     "test:seal": "tsx src/simple-decrypt-test.ts"
   },
   "keywords": [

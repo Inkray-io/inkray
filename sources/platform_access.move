@@ -20,7 +20,6 @@ module contracts::platform_access {
         id: UID,
         subscriber: address,
         expires_at: u64,
-        tier: u8,
     }
 
     public struct PlatformService has key, store {
@@ -35,7 +34,6 @@ module contracts::platform_access {
         subscription_id: ID,
         subscriber: address,
         expires_at: u64,
-        tier: u8,
         price_paid: u64,
     }
 
@@ -80,7 +78,6 @@ module contracts::platform_access {
     public fun subscribe_to_platform(
         service: &PlatformService,
         mut payment: Coin<SUI>,
-        tier: u8,
         clock: &Clock,
         ctx: &mut TxContext
     ): PlatformSubscription {
@@ -105,7 +102,6 @@ module contracts::platform_access {
             id,
             subscriber,
             expires_at,
-            tier,
         };
 
         // Transfer payment to service owner
@@ -115,7 +111,6 @@ module contracts::platform_access {
             subscription_id,
             subscriber,
             expires_at,
-            tier,
             price_paid: payment_amount,
         });
 
@@ -265,8 +260,8 @@ module contracts::platform_access {
         current_time < subscription.expires_at
     }
 
-    public fun get_subscription_info(subscription: &PlatformSubscription): (address, u64, u8) {
-        (subscription.subscriber, subscription.expires_at, subscription.tier)
+    public fun get_subscription_info(subscription: &PlatformSubscription): (address, u64) {
+        (subscription.subscriber, subscription.expires_at)
     }
 
     public fun get_service_info(service: &PlatformService): (u64, u64, address) {

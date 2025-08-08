@@ -44,7 +44,6 @@ export interface PlatformSubscription {
   id: string;
   subscriber: string;
   expires_at: string;
-  tier: number;
 }
 
 export interface PlatformService {
@@ -144,6 +143,7 @@ export interface SealDecryptionRequest {
   contentId: string; // The same ID used during encryption
   credentials: UserCredentials; // Available user credentials
   packageId?: string;
+  requestingClient?: import('./client.js').InkraySuiClient; // The client making the request (for access validation)
 }
 
 // Legacy interface for backward compatibility
@@ -193,6 +193,7 @@ export interface SealClientConfig {
   network: string;
   keyServerUrl: string;
   policyPackageId?: string;
+  suiClient?: import('./client.js').InkraySuiClient;
 }
 
 // CLI Command types
@@ -213,7 +214,6 @@ export interface PublishContentOptions {
 
 export interface SubscriptionOptions {
   duration: number; // days
-  tier: number;
 }
 
 export interface NFTMintOptions {

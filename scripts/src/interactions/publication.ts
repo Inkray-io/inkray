@@ -17,7 +17,11 @@ export interface PublicationResult {
 }
 
 export class PublicationManager {
-  private client = getDefaultSuiClient();
+  private client: import('../utils/client.js').InkraySuiClient;
+
+  constructor(client?: import('../utils/client.js').InkraySuiClient) {
+    this.client = client || getDefaultSuiClient();
+  }
 
   async createPublication(params: CreatePublicationParams): Promise<PublicationResult> {
     try {
@@ -59,7 +63,7 @@ export class PublicationManager {
 
         // Transfer publication and owner cap to sender
         tx.transferObjects([publication, ownerCap], tx.client.getAddress());
-      });
+      }, this.client);
 
       // Extract created objects from transaction result
       const createdObjects = result.objectChanges?.filter(change => change.type === 'created') || [];
@@ -131,7 +135,7 @@ export class PublicationManager {
             tx.pureAddress(contributorAddress),
           ],
         });
-      });
+      }, this.client);
 
       console.log(chalk.green(`✅ Contributor added successfully!`));
       console.log(chalk.gray(`Contributor: ${contributorAddress}`));
@@ -167,7 +171,7 @@ export class PublicationManager {
             tx.pureAddress(contributorAddress),
           ],
         });
-      });
+      }, this.client);
 
       console.log(chalk.green(`✅ Contributor removed successfully!`));
       console.log(chalk.gray(`Contributor: ${contributorAddress}`));
@@ -288,7 +292,7 @@ export class PublicationManager {
             tx.pure(newVaultId, 'address'),
           ],
         });
-      });
+      }, this.client);
 
       console.log(chalk.green(`✅ Vault ID updated successfully!`));
       console.log(chalk.gray(`New Vault ID: ${newVaultId}`));
@@ -361,42 +365,53 @@ export class PublicationManager {
 // Singleton instance
 let defaultManager: PublicationManager | null = null;
 
-export function createPublicationManager(): PublicationManager {
-  return new PublicationManager();
+export function createPublicationManager(client?: import('../utils/client.js').InkraySuiClient): PublicationManager {
+  return new PublicationManager(client);
 }
 
-export function getDefaultPublicationManager(): PublicationManager {
+export function getDefaultPublicationManager(client?: import('../utils/client.js').InkraySuiClient): PublicationManager {
   if (!defaultManager) {
-    defaultManager = new PublicationManager();
+    defaultManager = new PublicationManager(client);
   }
   return defaultManager;
 }
 
 // Convenience functions
-export async function createPublication(params: CreatePublicationParams): Promise<PublicationResult> {
-  return await getDefaultPublicationManager().createPublication(params);
+export async function createPublication(
+  params: CreatePublicationParams, 
+  client?: import('../utils/client.js').InkraySuiClient
+): Promise<PublicationResult> {
+  return await getDefaultPublicationManager(client).createPublication(params);
 }
 
 export async function addContributor(
   publicationId: string, 
   ownerCapId: string, 
-  contributorAddress: string
+  contributorAddress: string,
+  client?: import('../utils/client.js').InkraySuiClient
 ): Promise<TransactionResult> {
-  return await getDefaultPublicationManager().addContributor(publicationId, ownerCapId, contributorAddress);
+  return await getDefaultPublicationManager(client).addContributor(publicationId, ownerCapId, contributorAddress);
 }
 
 export async function removeContributor(
   publicationId: string, 
   ownerCapId: string, 
-  contributorAddress: string
+  contributorAddress: string,
+  client?: import('../utils/client.js').InkraySuiClient
 ): Promise<TransactionResult> {
-  return await getDefaultPublicationManager().removeContributor(publicationId, ownerCapId, contributorAddress);
+  return await getDefaultPublicationManager(client).removeContributor(publicationId, ownerCapId, contributorAddress);
 }
 
-export async function getPublication(publicationId: string): Promise<Publication | null> {
-  return await getDefaultPublicationManager().getPublication(publicationId);
+export async function getPublication(
+  publicationId: string,
+  client?: import('../utils/client.js').InkraySuiClient
+): Promise<Publication | null> {
+  return await getDefaultPublicationManager(client).getPublication(publicationId);
 }
 
-export async function getOwnedPublications(ownerAddress?: string): Promise<Publication[]> {
-  return await getDefaultPublicationManager().getOwnedPublications(ownerAddress);
+export async function getOwnedPublications(
+  ownerAddress?: string,
+  client?: import('../utils/client.js').InkraySuiClient
+): Promise<Publication[]> {
+  return await getDefaultPublicationManager(client).getOwnedPublications(ownerAddress);
 }

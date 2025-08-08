@@ -6,12 +6,15 @@ import chalk from 'chalk';
 
 export class TransactionBuilder {
   private tx: Transaction;
-  public client = getDefaultSuiClient();
+  public client: import('./client.js').InkraySuiClient;
 
-  constructor() {
+  constructor(client?: import('./client.js').InkraySuiClient) {
     this.tx = new Transaction();
     this.tx.setGasPrice(GAS_CONFIG.GAS_PRICE);
     this.tx.setGasBudget(GAS_CONFIG.MAX_GAS_BUDGET);
+    
+    // Use provided client or fall back to default
+    this.client = client || getDefaultSuiClient();
   }
 
   getTransaction(): Transaction {
@@ -166,7 +169,7 @@ export class TransactionBuilder {
 
   // Clone this builder
   clone(): TransactionBuilder {
-    const newBuilder = new TransactionBuilder();
+    const newBuilder = new TransactionBuilder(this.client);
     // Note: Deep cloning a Transaction object is complex
     // For now, we'll create a fresh transaction
     return newBuilder;
@@ -174,14 +177,15 @@ export class TransactionBuilder {
 }
 
 // Helper functions for common transaction patterns
-export function createTransaction(): TransactionBuilder {
-  return new TransactionBuilder();
+export function createTransaction(client?: import('./client.js').InkraySuiClient): TransactionBuilder {
+  return new TransactionBuilder(client);
 }
 
 export async function executeTransaction(
-  buildFn: (tx: TransactionBuilder) => void | Promise<void>
+  buildFn: (tx: TransactionBuilder) => void | Promise<void>,
+  client?: import('./client.js').InkraySuiClient
 ): Promise<TransactionResult> {
-  const tx = new TransactionBuilder();
+  const tx = new TransactionBuilder(client);
   await buildFn(tx);
   return await tx.execute();
 }
