@@ -42,7 +42,7 @@ interface WorkflowState {
   creatorAddress: string;
   adminAddress: string;
   encryptedContent: Uint8Array | null;
-  contentId: string;
+  contentId: Uint8Array;
   originalContent: string;
   blobId: string;
 }
@@ -98,7 +98,7 @@ class CreatorContributorWorkflow {
       creatorAddress: this.creatorClient.getAddress(),
       adminAddress: this.adminClient.getAddress(),
       encryptedContent: null,
-      contentId: '',
+      contentId: new Uint8Array(),
       originalContent: '',
       blobId: '',
     };
@@ -327,7 +327,10 @@ As a contributor to this publication, you have access to:
     console.log(chalk.gray('Encrypting content with Seal...'));
 
     try {
-      this.state.contentId = this.creatorSealClient.generateArticleContentId(`premium_article_${Date.now()}`);
+      this.state.contentId = this.creatorSealClient.generateArticleContentId(
+      this.state.publicationId!,
+      `premium_article_${Date.now()}`
+    );
 
       const encryptionOptions: SealEncryptionOptions = {
         contentId: this.state.contentId,
@@ -355,7 +358,7 @@ As a contributor to this publication, you have access to:
       const uploadResult = await this.uploadBufferWithCreatorWallet(
         this.state.encryptedContent!,
         'premium-article-encrypted.dat',
-        { epochs: 5, deletable: false }
+        { epochs: 1, deletable: false }
       );
 
       this.state.blobId = uploadResult.blobId;

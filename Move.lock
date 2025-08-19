@@ -2,7 +2,7 @@
 
 [move]
 version = 3
-manifest_digest = "F33E2D1A3D60350564B0E4526B5E9B66320F8822FE6283C5FBD6F724D32974D6"
+manifest_digest = "0EDF0A7BB478191BA35A62602CF6E6740E274351DDB6BD82E9B6EE41821F604E"
 deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -11,11 +11,11 @@ dependencies = [
 
 [[move.package]]
 id = "MoveStdlib"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.53.1", subdir = "crates/sui-framework/packages/move-stdlib" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.54.0", subdir = "crates/sui-framework/packages/move-stdlib" }
 
 [[move.package]]
 id = "Sui"
-source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.53.1", subdir = "crates/sui-framework/packages/sui-framework" }
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "testnet-v1.54.0", subdir = "crates/sui-framework/packages/sui-framework" }
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
@@ -23,7 +23,7 @@ dependencies = [
 
 [[move.package]]
 id = "WAL"
-source = { git = "https://github.com/MystenLabs/walrus.git", rev = "main", subdir = "contracts/wal" }
+source = { git = "https://github.com/MystenLabs/walrus.git", rev = "main", subdir = "testnet-contracts/wal" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -31,7 +31,7 @@ dependencies = [
 
 [[move.package]]
 id = "Walrus"
-source = { git = "https://github.com/MystenLabs/walrus.git", rev = "main", subdir = "contracts/walrus" }
+source = { git = "https://github.com/MystenLabs/walrus.git", rev = "main", subdir = "testnet-contracts/walrus" }
 
 dependencies = [
   { id = "Sui", name = "Sui" },
@@ -47,6 +47,12 @@ flavor = "sui"
 
 [env.testnet]
 chain-id = "4c78adac"
-original-published-id = "0xa462e6057d02479109cab6e926b12a61f3dd9a459a2f79206ea42f52dde4ac2a"
-latest-published-id = "0xa462e6057d02479109cab6e926b12a61f3dd9a459a2f79206ea42f52dde4ac2a"
+original-published-id = "0x378c7d33854b4fefe4be2422286a72506202c02b8fa9c77635853a433a5e80f0"
+latest-published-id = "0x378c7d33854b4fefe4be2422286a72506202c02b8fa9c77635853a433a5e80f0"
+published-version = "1"
+
+[env.mainnet]
+chain-id = "35834a8a"
+original-published-id = "0xc31354752d9915e0c3090effa8c80f78c1dd079d26d13845c3cf354215c9dd3b"
+latest-published-id = "0xc31354752d9915e0c3090effa8c80f78c1dd079d26d13845c3cf354215c9dd3b"
 published-version = "1"

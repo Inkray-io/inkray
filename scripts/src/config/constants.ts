@@ -43,29 +43,29 @@ export const FUNCTIONS = {
   CREATE_PUBLICATION: 'create_publication',
   ADD_CONTRIBUTOR: 'add_contributor',
   REMOVE_CONTRIBUTOR: 'remove_contributor',
-  
+
   // Publication Vault
   CREATE_VAULT: 'create_vault',
   STORE_BLOB: 'store_blob',
   GET_BLOB: 'get_blob',
   REMOVE_BLOB: 'remove_blob',
   UPDATE_RENEWAL_EPOCH: 'update_renewal_epoch',
-  
+
   // Content Registry
   PUBLISH_ARTICLE: 'publish_article',
   PUBLISH_ARTICLE_AS_OWNER: 'publish_article_as_owner',
   UPDATE_ARTICLE: 'update_article',
-  
+
   // Platform Access
   SUBSCRIBE_TO_PLATFORM: 'subscribe_to_platform',
   EXTEND_SUBSCRIPTION: 'extend_subscription',
   RENEW_SUBSCRIPTION: 'renew_subscription',
   SEAL_APPROVE_PLATFORM_SUBSCRIPTION: 'seal_approve_platform_subscription',
-  
+
   // Article NFT
   MINT_ARTICLE_NFT: 'mint_article_nft',
   SEAL_APPROVE_ARTICLE_NFT: 'seal_approve_article_nft',
-  
+
   // Platform Economics
   CREATE_CREATOR_TREASURY: 'create_creator_treasury',
   TIP_ARTICLE: 'tip_article',
@@ -80,7 +80,7 @@ export const GAS_CONFIG = {
 
 // Default Values
 export const DEFAULTS = {
-  STORAGE_EPOCHS: parseInt(process.env.DEFAULT_STORAGE_EPOCHS || '5'),
+  STORAGE_EPOCHS: parseInt(process.env.DEFAULT_STORAGE_EPOCHS || '1'),
   SUBSCRIPTION_DURATION_DAYS: parseInt(process.env.DEFAULT_SUBSCRIPTION_DURATION_DAYS || '30'),
   SUBSCRIPTION_PRICE_SUI: parseInt(process.env.DEFAULT_SUBSCRIPTION_PRICE_SUI || '10'),
   NFT_ROYALTY_PERCENT: 10,

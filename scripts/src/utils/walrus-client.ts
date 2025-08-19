@@ -134,14 +134,15 @@ export class InkrayWalrusClient {
       }
 
       const file = files[0];
-      const content = file instanceof File 
-        ? await file.arrayBuffer() 
+
+      const content = file instanceof WalrusFile
+        ? await file.bytes()
         : new Uint8Array(await (file as any).arrayBuffer());
 
       console.log(chalk.green(`✓ Blob downloaded successfully`));
       console.log(chalk.gray(`  Size: ${content.byteLength} bytes`));
 
-      return new Uint8Array(content);
+      return content;
     } catch (error) {
       console.error(chalk.red(`❌ Download failed: ${error}`));
       throw error;

@@ -1,7 +1,5 @@
 #[test_only]
 module contracts::mock_blob {
-    use sui::object::{Self, ID, UID};
-    use sui::tx_context::{Self, TxContext};
 
     /// A mock Blob for testing purposes. It has `store` and `drop` abilities,
     /// unlike the real `walrus::blob::Blob`, which makes it usable in test scenarios.

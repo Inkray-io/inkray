@@ -367,3 +367,17 @@ export async function downloadAsText(blobId: string, encoding?: string): Promise
 export async function downloadAsJSON<T = any>(blobId: string): Promise<T> {
   return await getDefaultDownloadManager().downloadAsJSON<T>(blobId);
 }
+
+/**
+ * Download blob as binary data (Uint8Array)
+ * This is a convenience function for getting raw binary data
+ */
+export async function downloadBinaryBlob(blobId: string): Promise<Uint8Array> {
+  const result = await getDefaultDownloadManager().downloadBlob(blobId);
+  
+  if (!result.data) {
+    throw new Error('No binary data received from blob download');
+  }
+  
+  return result.data;
+}

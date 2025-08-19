@@ -86,7 +86,7 @@ export class CreatorJourney {
   private ownerCapId: string = '';
   private vaultId: string = '';
   private encryptedContent: Uint8Array | null = null;
-  private contentId: string = '';
+  private contentId: Uint8Array = new Uint8Array();
   private originalContent: string = '';
 
   private async step1_CreatePublication(options: CreatorJourneyOptions): Promise<void> {
@@ -227,7 +227,10 @@ Join our community and stay updated with our latest content!
     console.log(chalk.gray('Encrypting premium content...'));
 
     // TODO: Replace with backend-generated content ID
-    this.contentId = this.sealClient.generateArticleContentId(`premium_article_${Date.now()}`);
+    this.contentId = this.sealClient.generateArticleContentId(
+      this.publicationId!,
+      `premium_article_${Date.now()}`
+    );
 
     const encryptionOptions: SealEncryptionOptions = {
       contentId: this.contentId,

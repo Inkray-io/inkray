@@ -14,28 +14,32 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Get the shared publication object
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             // Verify publication properties
-            let (name, description, vault_id) = publication::get_publication_info(&publication);
+            let name = publication::get_name(&publication);
             test_utils::assert_eq(name, test_utils::get_test_publication_name());
-            test_utils::assert_eq(description, test_utils::get_test_publication_description());
-            test_utils::assert_eq(vault_id, @0x1.to_id());
 
             // Verify owner cap
-            let cap_pub_id = publication::get_publication_id(&owner_cap);
-            test_utils::assert_eq(cap_pub_id, object::id(&publication));
+            test_utils::assert_true(publication::verify_owner_cap(&owner_cap, &publication));
 
             // Verify contributors list is empty initially
             let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(sui::vec_set::size(contributors), 0);
+            test_utils::assert_eq(vector::length(contributors), 0);
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -50,12 +54,19 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Add contributor to shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             // Add contributor
             publication::add_contributor(
@@ -70,14 +81,14 @@ module contracts::publication_tests {
 
             // Verify contributor count
             let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(sui::vec_set::size(contributors), 1);
+            test_utils::assert_eq(vector::length(contributors), 1);
 
             // Verify contributor authorization
             test_utils::assert_true(
                 publication::is_contributor(&publication, contributor())
             );
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -89,15 +100,22 @@ module contracts::publication_tests {
     fun test_add_multiple_contributors() {
         let mut scenario = test_utils::begin_scenario(creator());
         
-        // Create publication and add multiple contributors
+        // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Add multiple contributors to shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             // Add first contributor
             publication::add_contributor(
@@ -121,9 +139,9 @@ module contracts::publication_tests {
 
             // Verify contributor count
             let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(sui::vec_set::size(contributors), 2);
+            test_utils::assert_eq(vector::length(contributors), 2);
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -135,15 +153,22 @@ module contracts::publication_tests {
     fun test_remove_contributor() {
         let mut scenario = test_utils::begin_scenario(creator());
         
-        // Create publication and add contributor
+        // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Add and remove contributor from shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             // Add contributor
             publication::add_contributor(
@@ -166,12 +191,12 @@ module contracts::publication_tests {
 
             // Verify contributor was removed
             let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(sui::vec_set::size(contributors), 0);
+            test_utils::assert_eq(vector::length(contributors), 0);
             test_utils::assert_false(
                 publication::is_contributor(&publication, contributor())
             );
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -186,24 +211,26 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Test owner authorization with shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
-            // Verify owner authorization
+            // Verify owner authorization using cap verification
             test_utils::assert_true(
-                publication::is_owner_with_cap_or_contributor(&publication, creator(), &owner_cap)
+                publication::verify_owner_cap(&owner_cap, &publication)
             );
 
-            // Verify another user is also considered authorized if the valid cap is presented
-            test_utils::assert_true(
-                publication::is_owner_with_cap_or_contributor(&publication, user1(), &owner_cap)
-            ); // Note: Owner cap authorizes the transaction, ignoring the user param
-
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -212,49 +239,41 @@ module contracts::publication_tests {
 
     /// Test that an unauthorized user cannot add a contributor.
     #[test]
-    #[expected_failure(abort_code = contracts::publication::ENotOwner)]
+    #[expected_failure(abort_code = contracts::publication::E_NOT_OWNER)]
     fun test_unauthorized_add_contributor() {
         let mut scenario = test_utils::begin_scenario(creator());
         
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
-
-            test_utils::return_to_sender(&scenario, publication);
+            
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
-        // Try to add contributor as non-owner
+        // Try to add contributor with wrong cap
         test_utils::next_tx(&mut scenario, user1()); // Different user
         {
-            let mut publication = test_utils::take_from_address<Publication>(&scenario, creator());
-            let owner_cap = test_utils::take_from_address<PublicationOwnerCap>(&scenario, creator());
-
-            // This should fail - user1 doesn't own a different publication
-            let (mut wrong_publication, wrong_cap) = publication::create_publication(
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            
+            // Create a different publication by user1 to get a wrong cap
+            let (wrong_cap, _wrong_addr) = publication::create(
                 string::utf8(b"Wrong Publication"),
-                string::utf8(b"Wrong Description"),
-                @0x2.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
 
-            // This should abort with ENotOwner
+            // This should abort with E_NOT_OWNER - using wrong cap for this publication
             publication::add_contributor(
                 &wrong_cap,
-                &mut publication, // Using wrong cap for this publication
+                &mut publication,
                 contributor(),
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_address(creator(), publication);
-            test_utils::return_to_address(creator(), owner_cap);
-            test_utils::return_to_sender(&scenario, wrong_publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, wrong_cap);
         };
 
@@ -263,19 +282,26 @@ module contracts::publication_tests {
 
     /// Test that adding a duplicate contributor fails.
     #[test]
-    #[expected_failure(abort_code = contracts::publication::EContributorAlreadyExists)]
+    #[expected_failure(abort_code = contracts::publication::E_CONTRIBUTOR_EXISTS)]
     fun test_add_duplicate_contributor() {
         let mut scenario = test_utils::begin_scenario(creator());
         
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Add duplicate contributor to shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             // Add contributor
             publication::add_contributor(
@@ -293,7 +319,7 @@ module contracts::publication_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -302,19 +328,26 @@ module contracts::publication_tests {
 
     /// Test that removing a non-existent contributor fails.
     #[test]
-    #[expected_failure(abort_code = contracts::publication::EContributorNotFound)]
+    #[expected_failure(abort_code = contracts::publication::E_CONTRIBUTOR_NOT_FOUND)]
     fun test_remove_nonexistent_contributor() {
         let mut scenario = test_utils::begin_scenario(creator());
         
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Try to remove nonexistent contributor from shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             // Try to remove contributor that was never added - should fail
             publication::remove_contributor(
@@ -324,7 +357,7 @@ module contracts::publication_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -339,12 +372,19 @@ module contracts::publication_tests {
         // Test publication creation event
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Test contributor events with shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             // Add contributor to test event
             publication::add_contributor(
@@ -362,7 +402,7 @@ module contracts::publication_tests {
                 test_scenario::ctx(&mut scenario)
             );
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -378,17 +418,24 @@ module contracts::publication_tests {
 
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 string::utf8(b""),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Check empty name in shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
-            let (name, _, _) = publication::get_publication_info(&publication);
+            let name = publication::get_name(&publication);
             assert!(name == string::utf8(b""));
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 
@@ -402,12 +449,19 @@ module contracts::publication_tests {
 
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (mut publication, owner_cap) = publication::create_publication(
+            let (owner_cap, _publication_addr) = publication::create(
                 test_utils::get_test_publication_name(),
-                test_utils::get_test_publication_description(),
-                @0x1.to_id(),
                 test_scenario::ctx(&mut scenario)
             );
+            
+            test_utils::return_to_sender(&scenario, owner_cap);
+        };
+        
+        // Add owner as contributor to shared publication
+        test_utils::next_tx(&mut scenario, creator());
+        {
+            let mut publication = test_utils::take_shared<Publication>(&scenario);
+            let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
             publication::add_contributor(
                 &owner_cap,
@@ -418,7 +472,7 @@ module contracts::publication_tests {
 
             assert!(publication::is_contributor(&publication, creator()));
 
-            test_utils::return_to_sender(&scenario, publication);
+            test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
 

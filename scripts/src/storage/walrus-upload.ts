@@ -21,8 +21,16 @@ export interface UploadResult {
 }
 
 export class WalrusUploadManager {
-  private walrusClient = getDefaultWalrusClient();
-  private suiClient = getDefaultSuiClient();
+  private walrusClient: import('../utils/walrus-client.js').InkrayWalrusClient;
+  private suiClient: import('../utils/client.js').InkraySuiClient;
+
+  constructor(options?: {
+    walrusClient?: import('../utils/walrus-client.js').InkrayWalrusClient;
+    suiClient?: import('../utils/client.js').InkraySuiClient;
+  }) {
+    this.walrusClient = options?.walrusClient || getDefaultWalrusClient();
+    this.suiClient = options?.suiClient || getDefaultSuiClient();
+  }
 
   async uploadFile(
     filePath: string, 
@@ -305,8 +313,11 @@ export class WalrusUploadManager {
 // Singleton instance
 let defaultUploadManager: WalrusUploadManager | null = null;
 
-export function createUploadManager(): WalrusUploadManager {
-  return new WalrusUploadManager();
+export function createUploadManager(options?: {
+  walrusClient?: import('../utils/walrus-client.js').InkrayWalrusClient;
+  suiClient?: import('../utils/client.js').InkraySuiClient;
+}): WalrusUploadManager {
+  return new WalrusUploadManager(options);
 }
 
 export function getDefaultUploadManager(): WalrusUploadManager {
@@ -331,4 +342,16 @@ export async function uploadJSON(data: any, fileName: string, options?: UploadOp
 
 export async function uploadBuffer(buffer: Uint8Array, fileName: string, options?: UploadOptions): Promise<UploadResult> {
   return await getDefaultUploadManager().uploadBuffer(buffer, fileName, options);
+}
+
+export async function uploadBufferWithClient(
+  buffer: Uint8Array, 
+  fileName: string, 
+  suiClient: import('../utils/client.js').InkraySuiClient,
+  options?: UploadOptions
+): Promise<UploadResult> {
+  const { createWalrusClient } = await import('../utils/walrus-client.js');
+  const walrusClient = createWalrusClient({ suiClient });
+  const uploadManager = createUploadManager({ walrusClient, suiClient });
+  return await uploadManager.uploadBuffer(buffer, fileName, options);
 }

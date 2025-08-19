@@ -12,7 +12,7 @@ export class TransactionBuilder {
     this.tx = new Transaction();
     this.tx.setGasPrice(GAS_CONFIG.GAS_PRICE);
     this.tx.setGasBudget(GAS_CONFIG.MAX_GAS_BUDGET);
-    
+
     // Use provided client or fall back to default
     this.client = client || getDefaultSuiClient();
   }
@@ -107,9 +107,9 @@ export class TransactionBuilder {
   }): Promise<TransactionResult> {
     try {
       const keypair = this.client.getKeypair();
-      
+
       console.log(chalk.blue(`📤 Executing transaction...`));
-      
+
       const result = await this.client.getClient().signAndExecuteTransaction({
         transaction: this.tx,
         signer: keypair,
@@ -128,7 +128,7 @@ export class TransactionBuilder {
 
       console.log(chalk.green(`✓ Transaction executed successfully`));
       console.log(chalk.gray(`  Digest: ${result.digest}`));
-      
+
       if (result.effects?.gasUsed) {
         const gasUsed = result.effects.gasUsed;
         console.log(chalk.gray(`  Gas used: ${gasUsed.computationCost} computation, ${gasUsed.storageCost} storage`));
@@ -151,7 +151,7 @@ export class TransactionBuilder {
   async dryRun(): Promise<any> {
     try {
       console.log(chalk.blue(`🧪 Dry running transaction...`));
-      
+
       const result = await this.client.getClient().dryRunTransactionBlock({
         transactionBlock: await this.tx.build({
           client: this.client.getClient(),
@@ -193,7 +193,7 @@ export async function executeTransaction(
 // Common transaction builders
 export class CommonTransactions {
   static async transferSui(
-    recipient: string, 
+    recipient: string,
     amount: number | string | bigint
   ): Promise<TransactionResult> {
     return executeTransaction(async (tx) => {
@@ -217,7 +217,7 @@ export class CommonTransactions {
         typeArguments: params.typeArguments,
         arguments: params.arguments,
       });
-      
+
       const clientAddress = getDefaultSuiClient().getAddress();
       tx.transferObjects([nft], clientAddress);
     });
@@ -244,7 +244,7 @@ export class CommonTransactions {
 
 // Transaction event parsing utilities
 export function parseEvents(events: any[], eventType: string): any[] {
-  return events.filter(event => 
+  return events.filter(event =>
     event.type && event.type.includes(eventType)
   ).map(event => event.parsedJson);
 }
@@ -258,7 +258,7 @@ export function extractCreatedObjectIds(objectChanges: any[]): string[] {
 }
 
 export function extractCreatedObjectsByType(objectChanges: any[], objectType: string): any[] {
-  return findObjectChanges(objectChanges, 'created').filter(change => 
+  return findObjectChanges(objectChanges, 'created').filter(change =>
     change.objectType && change.objectType.includes(objectType)
   );
 }

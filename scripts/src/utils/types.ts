@@ -111,7 +111,7 @@ export interface WalrusUploadResponse {
 
 // Seal-related types
 export interface SealEncryptionOptions {
-  contentId: string; // The unique identifier for this content (article/media)
+  contentId: string | Uint8Array; // BCS-encoded IdV1 or legacy string identifier
   packageId?: string;
   threshold?: number; // Number of key servers required for decryption (default: 2)
 }
@@ -140,7 +140,7 @@ export interface UserCredentials {
 
 export interface SealDecryptionRequest {
   encryptedData: Uint8Array;
-  contentId: string; // The same ID used during encryption
+  contentId: string | Uint8Array; // BCS-encoded IdV1 or legacy string identifier
   credentials: UserCredentials; // Available user credentials
   packageId?: string;
   requestingClient?: import('./client.js').InkraySuiClient; // The client making the request (for access validation)

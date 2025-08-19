@@ -4,7 +4,6 @@ module contracts::inkray_test_utils {
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
     use sui::clock::{Self, Clock};
-    use sui::transfer;
     use std::string::{Self, String};
 
     // === Test Addresses ===
@@ -119,11 +118,11 @@ module contracts::inkray_test_utils {
     }
 
     public fun return_to_sender<T: key + store>(scenario: &Scenario, obj: T) {
-        transfer::public_transfer(obj, test_scenario::sender(scenario));
+        sui::transfer::public_transfer(obj, test_scenario::sender(scenario));
     }
 
     public fun return_to_address<T: key + store>(addr: address, obj: T) {
-        transfer::public_transfer(obj, addr);
+        sui::transfer::public_transfer(obj, addr);
     }
 
     // === Event Testing Helpers ===
@@ -167,34 +166,15 @@ module contracts::inkray_test_utils {
     
     public fun standard_publication_setup(scenario: &mut Scenario) {
         use contracts::publication;
-        use contracts::publication_vault;
-        use contracts::mock_blob::MockBlob;
 
         next_tx(scenario, creator());
         {
-            // Create publication
-            let (mut publication, owner_cap) = publication::create_publication(
+            // Create publication with vault (new API)
+            let (owner_cap, _publication_addr) = publication::create(
                 get_test_publication_name(),
-                get_test_publication_description(),
-                @0x1.to_id(), // placeholder vault_id
                 test_scenario::ctx(scenario)
             );
 
-            // Create shared vault - now creates and shares automatically  
-            publication_vault::create_vault<MockBlob>(
-                10, // batch size
-                test_scenario::ctx(scenario)
-            );
-
-            // Add contributor
-            publication::add_contributor(
-                &owner_cap,
-                &mut publication,
-                contributor(),
-                test_scenario::ctx(scenario)
-            );
-
-            return_to_sender(scenario, publication);
             return_to_sender(scenario, owner_cap);
         };
     }
@@ -213,26 +193,8 @@ module contracts::inkray_test_utils {
         contributor_addr: address
     ) {
         let contributors = contracts::publication::get_contributors(publication);
-        assert!(sui::vec_set::contains(contributors, &contributor_addr), 0);
+        assert!(vector::contains(contributors, &contributor_addr), 0);
     }
 
-    public fun assert_subscription_active(
-        subscription: &contracts::platform_access::PlatformSubscription,
-        clock: &Clock
-    ) {
-        assert!(
-            contracts::platform_access::is_subscription_active(subscription, clock),
-            0
-        );
-    }
-
-    public fun assert_subscription_expired(
-        subscription: &contracts::platform_access::PlatformSubscription,
-        clock: &Clock
-    ) {
-        assert!(
-            contracts::platform_access::is_subscription_expired(subscription, clock),
-            0
-        );
-    }
+    // Note: Subscription helper functions removed until subscription module is fully integrated
 }

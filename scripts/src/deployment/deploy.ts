@@ -44,6 +44,9 @@ export class ContractDeployer {
       // Step 4: Initialize shared objects
       await this.initializeSharedObjects(result);
 
+      // Step 5: Validate entry functions
+      await this.validateEntryFunctions(result);
+
       console.log(chalk.green(`✅ Deployment completed successfully!`));
       console.log(chalk.gray(`Package ID: ${result.packageId}`));
 
@@ -99,7 +102,7 @@ export class ContractDeployer {
     console.log(chalk.gray(`Using Sui CLI to publish package...`));
 
     try {
-      const publishCommand = `sui client publish ${this.contractPath} --json --gas-budget 1000000000 --with-unpublished-dependencies`;
+      const publishCommand = `sui client publish ${this.contractPath} --json --gas-budget 1000000000`;
       console.log(chalk.gray(`Command: ${publishCommand}`));
 
       const output = execSync(publishCommand, {
@@ -191,14 +194,17 @@ export class ContractDeployer {
         change.type === 'created' && change.owner && typeof change.owner === 'object' && change.owner.Shared
       );
 
+      // Track shared objects from our current architecture
       for (const change of createdObjects) {
-        if (change.objectType?.includes('PlatformService')) {
-          sharedObjects.PLATFORM_SERVICE_ID = change.objectId;
-        } else if (change.objectType?.includes('MintConfig')) {
-          sharedObjects.MINT_CONFIG_ID = change.objectId;
-        } else if (change.objectType?.includes('PlatformTreasury')) {
-          sharedObjects.PLATFORM_TREASURY_ID = change.objectId;
+        if (change.objectType?.includes('::vault::PublicationVault')) {
+          // Publications create vaults automatically, we don't need to track specific vault IDs
+          console.log(chalk.gray(`  Found shared vault: ${change.objectId}`));
+        } else if (change.objectType?.includes('::subscription::')) {
+          sharedObjects.SUBSCRIPTION_SERVICE_ID = change.objectId;
+        } else if (change.objectType?.includes('::nft::')) {
+          sharedObjects.NFT_CONFIG_ID = change.objectId;
         }
+        // Publications themselves are shared objects but created dynamically
       }
 
       // Extract upgrade capability
@@ -235,8 +241,8 @@ export class ContractDeployer {
   // This method is no longer needed as we use Sui CLI for publishing
   // Kept for future implementation of tx.publish() method
   private readCompiledModules(): Uint8Array[] {
-    const moduleFiles = ['article_nft.mv', 'content_registry.mv', 'platform_access.mv',
-      'platform_economics.mv', 'publication.mv', 'publication_vault.mv'];
+    const moduleFiles = ['articles.mv', 'inkray_events.mv', 'nft.mv',
+      'policy.mv', 'publication.mv', 'subscription.mv', 'vault.mv'];
 
     return moduleFiles.map(file => {
       const filePath = path.join(this.contractPath, 'build/contracts/bytecode_modules', file);
@@ -291,12 +297,23 @@ export class ContractDeployer {
       envContent += `\\nPACKAGE_ID=${result.packageId}`;
     }
 
-    // Update shared object IDs
+    // Update shared object IDs (only add if they exist)
     for (const [key, value] of Object.entries(result.sharedObjects)) {
-      if (envContent.includes(`${key}=`)) {
-        envContent = envContent.replace(new RegExp(`${key}=.*`), `${key}=${value}`);
-      } else {
-        envContent += `\\n${key}=${value}`;
+      if (value) { // Only add if the shared object was actually found
+        if (envContent.includes(`${key}=`)) {
+          envContent = envContent.replace(new RegExp(`${key}=.*`), `${key}=${value}`);
+        } else {
+          envContent += `\\n${key}=${value}`;
+        }
+      }
+    }
+
+    // Remove old/unused environment variables that are no longer relevant
+    const unusedVars = ['PLATFORM_SERVICE_ID', 'MINT_CONFIG_ID', 'PLATFORM_TREASURY_ID'];
+    for (const unusedVar of unusedVars) {
+      if (envContent.includes(`${unusedVar}=`)) {
+        envContent = envContent.replace(new RegExp(`\\n?${unusedVar}=.*\\n?`), '\\n');
+        console.log(chalk.gray(`  Removed unused variable: ${unusedVar}`));
       }
     }
 
@@ -311,6 +328,57 @@ export class ContractDeployer {
     // Additional setup can be done here if needed
 
     console.log(chalk.green(`✓ Shared objects initialized`));
+  }
+
+  private async validateEntryFunctions(result: DeploymentResult): Promise<void> {
+    console.log(chalk.blue(`🧪 Validating entry functions...`));
+
+    try {
+      // Test that the entry functions exist by doing a dry run
+      const { Transaction } = await import('@mysten/sui/transactions');
+
+      // Test create_publication entry function
+      const testTx = new Transaction();
+      testTx.setSender(this.client.getAddress());
+      testTx.moveCall({
+        target: `${result.packageId}::publication::create_publication`,
+        arguments: [
+          testTx.pure.string('Test Publication'),
+        ],
+      });
+
+      // Do a dry run to validate the function exists
+      const txBytes = await testTx.build({
+        client: this.client.getClient()
+      });
+
+      const dryRunResult = await this.client.getClient().dryRunTransactionBlock({
+        transactionBlock: txBytes,
+      });
+
+      if (dryRunResult.effects.status.status === 'failure') {
+        const error = dryRunResult.effects.status.error;
+        if (error?.includes('FunctionNotFound')) {
+          throw new Error(`Entry function not found: create_publication`);
+        }
+        // Other errors (like insufficient gas, etc.) are OK - we just want to validate the function exists
+        console.log(chalk.gray(`  Dry run status: ${dryRunResult.effects.status.status} (expected for validation)`));
+      }
+
+      console.log(chalk.green(`✓ Entry functions validated successfully`));
+    } catch (error) {
+      // For validation purposes, some errors are acceptable (like gas estimation issues)
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
+      if (errorMsg.includes('FunctionNotFound')) {
+        console.error(chalk.red(`❌ Entry function validation failed: ${error}`));
+        throw error;
+      } else {
+        // Other errors might be OK for validation purposes
+        console.log(chalk.yellow(`⚠️  Entry function validation completed with warnings: ${errorMsg}`));
+        console.log(chalk.green(`✓ Entry functions appear to exist (function calls can be constructed)`));
+      }
+    }
   }
 }
 

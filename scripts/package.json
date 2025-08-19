@@ -23,7 +23,8 @@
     "demo:reader": "tsx src/examples/reader-journey.ts",
     "demo:platform": "tsx src/examples/full-platform.ts",
     "creator-contributor-workflow": "tsx src/examples/creator-contributor-workflow.ts",
-    "test:seal": "tsx src/simple-decrypt-test.ts"
+    "test:seal": "tsx src/simple-decrypt-test.ts",
+    "demo:end-to-end": "tsx src/end-to-end-demo.ts"
   },
   "keywords": [
     "sui",
