@@ -92,7 +92,7 @@ module contracts::nft {
         assert!(coin::value(&payment) >= config.base_price, E_INSUFFICIENT_PAYMENT);
         
         let article_addr = articles::get_article_address(article);
-        let (title, _, _, author, _, _, _) = articles::get_article_info(article);
+        let (title, _, _, _, author, _, _) = articles::get_article_info(article);
         
         let nft_id = object::new(ctx);
         let nft_addr = object::uid_to_address(&nft_id);

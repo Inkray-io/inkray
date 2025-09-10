@@ -170,7 +170,7 @@ module contracts::inkray_test_utils {
         next_tx(scenario, creator());
         {
             // Create publication with vault (new API)
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 get_test_publication_name(),
                 test_scenario::ctx(scenario)
             );

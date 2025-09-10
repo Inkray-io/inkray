@@ -1,25 +1,34 @@
+/// Publication management module for Inkray decentralized blogging platform.
+/// 
+/// This module handles publication creation, ownership through capabilities,
+/// and contributor management with proper authorization controls.
 module contracts::publication;
 
 use contracts::inkray_events;
 use contracts::vault;
 use std::string::String;
 
-// === Errors ===
+// === Error Constants ===
 const E_NOT_OWNER: u64 = 0;
 const E_CONTRIBUTOR_NOT_FOUND: u64 = 1;
 const E_CONTRIBUTOR_EXISTS: u64 = 2;
 
-// === Structs ===
+// === Core Data Structures ===
+
+/// Publication represents a shared blog publication with contributor management.
+/// This is a shared object that multiple contributors can access concurrently.
 public struct Publication has key, store {
     id: UID,
     name: String,
-    contributors: vector<address>, // bounded collection - use vector
-    vault_id: ID, // child PublicationVault
+    contributors: vector<address>, // bounded collection - use vector for small sets
+    vault_id: ID, // reference to associated PublicationVault
 }
 
+/// Owner capability for publication administration.
+/// Ownership is proven by possessing this capability, not by address checks.
 public struct PublicationOwnerCap has key, store {
     id: UID,
-    publication_id: ID, // publication object id as address
+    publication_id: ID, // ties capability to specific publication
 }
 
 // === Public Functions ===
@@ -104,9 +113,9 @@ public fun is_contributor(publication: &Publication, user: address): bool {
 }
 
 /// Check if address holds ownership capability for this publication
-/// Note: This function now requires the OwnerCap to prove ownership
+/// Note: Alias for verify_owner_cap() for backward compatibility
 public fun is_owner_with_cap(owner_cap: &PublicationOwnerCap, publication: &Publication): bool {
-    owner_cap.publication_id == publication.id.to_inner()
+    verify_owner_cap(owner_cap, publication)
 }
 
 public fun get_vault_id(publication: &Publication): ID {
@@ -131,6 +140,7 @@ public fun get_publication_object_id(publication: &Publication): ID {
 }
 
 /// Get publication address from publication object (legacy support)
+/// Note: Prefer using get_publication_object_id() for new code
 public fun get_publication_address(publication: &Publication): address {
     object::uid_to_address(&publication.id)
 }
@@ -173,8 +183,8 @@ public fun store_blob_in_vault(
     // Verify vault belongs to this publication
     assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
 
-    // Store blob in vault
-    vault::store_blob(vault, blob);
+    // Store blob in vault (vault will emit the event)
+    vault::store_blob(vault, blob, caller);
 }
 
 /// Store blob in publication vault using owner capability
@@ -183,15 +193,18 @@ public fun store_blob_in_vault_as_owner(
     publication: &Publication,
     vault: &mut vault::PublicationVault,
     blob: walrus::blob::Blob,
+    ctx: &TxContext,
 ) {
+    let caller = tx_context::sender(ctx);
+    
     // Check owner authorization
     assert_owner_access(owner_cap, publication);
     
     // Verify vault belongs to this publication
     assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
 
-    // Store blob in vault
-    vault::store_blob(vault, blob);
+    // Store blob in vault (vault will emit the event)
+    vault::store_blob(vault, blob, caller);
 }
 
 /// Remove blob from publication vault (contributor only - owners use remove_blob_from_vault_as_owner)
@@ -209,8 +222,8 @@ public fun remove_blob_from_vault(
     // Verify vault belongs to this publication
     assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
 
-    // Remove blob from vault
-    vault::remove_blob(vault, blob_id)
+    // Remove blob from vault (vault will emit the event)
+    vault::remove_blob(vault, blob_id, caller)
 }
 
 /// Remove blob from publication vault using owner capability
@@ -219,13 +232,16 @@ public fun remove_blob_from_vault_as_owner(
     publication: &Publication,
     vault: &mut vault::PublicationVault,
     blob_id: ID,
+    ctx: &TxContext,
 ): walrus::blob::Blob {
+    let caller = tx_context::sender(ctx);
+    
     // Check owner authorization
     assert_owner_access(owner_cap, publication);
     
     // Verify vault belongs to this publication
     assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
 
-    // Remove blob from vault
-    vault::remove_blob(vault, blob_id)
+    // Remove blob from vault (vault will emit the event)
+    vault::remove_blob(vault, blob_id, caller)
 }

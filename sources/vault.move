@@ -1,22 +1,31 @@
+/// Shared vault system for decentralized blob storage with contributor access.
+///
+/// This module provides a shared object model where multiple contributors can
+/// concurrently access and store blobs in publication-specific vaults.
 module contracts::vault;
 
 use contracts::inkray_events;
 use sui::table::{Self, Table};
 
-// === Access Enum ===
+// === Access Control Enum ===
+/// Defines content access levels for articles and blobs
 public enum Access has copy, drop, store {
-    Free,
-    Gated,
+    Free,   // Publicly accessible content
+    Gated,  // Premium/paid content requiring authorization
 }
 
-// === PublicationVault (child object) ===
+// === Core Data Structures ===
+
+/// Shared vault for storing blobs associated with a publication.
+/// Multiple contributors can concurrently access this shared object.
 public struct PublicationVault has key, store {
     id: UID,
-    blobs: Table<ID, walrus::blob::Blob>, // unlimited blob storage via Table, keyed by blob object ID
-    publication_id: ID, // parent publication
+    blobs: Table<ID, walrus::blob::Blob>, // unlimited blob storage, keyed by blob object ID
+    publication_id: ID, // reference to parent publication
 }
 
-// === RenewCap (platform-owned) ===
+/// Platform capability for managing vault renewals.
+/// This allows the platform to renew blob storage without blocking contributor access.
 public struct RenewCap has key, store {
     id: UID,
 }
@@ -60,10 +69,19 @@ public(package) fun create_and_share_vault(publication_id: ID, ctx: &mut TxConte
 public(package) fun store_blob(
     vault: &mut PublicationVault,
     blob: walrus::blob::Blob,
+    stored_by: address,
 ) {
     let blob_id = walrus::blob::object_id(&blob);
     assert!(!table::contains(&vault.blobs, blob_id), E_ASSET_EXISTS);
     table::add(&mut vault.blobs, blob_id, blob);
+    
+    // Emit blob stored event
+    inkray_events::emit_blob_stored(
+        vault.id.to_inner(),
+        vault.publication_id,
+        blob_id,
+        stored_by,
+    );
 }
 
 /// Remove blob from vault
@@ -71,9 +89,20 @@ public(package) fun store_blob(
 public(package) fun remove_blob(
     vault: &mut PublicationVault,
     blob_id: ID,
+    removed_by: address,
 ): walrus::blob::Blob {
     assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
-    table::remove(&mut vault.blobs, blob_id)
+    let blob = table::remove(&mut vault.blobs, blob_id);
+    
+    // Emit blob removed event
+    inkray_events::emit_blob_removed(
+        vault.id.to_inner(),
+        vault.publication_id,
+        blob_id,
+        removed_by,
+    );
+    
+    blob
 }
 
 /// Check if blob exists
@@ -99,8 +128,6 @@ public fun renew_all(vault: &mut PublicationVault, _cap: &RenewCap) {
     );
 }
 
-// === Blob Helper Functions ===
-
 // === Access Enum Functions ===
 public fun access_free(): Access { Access::Free }
 
@@ -120,15 +147,13 @@ public fun is_gated(access: &Access): bool {
     }
 }
 
-// === Utility Functions ===
+// === View Functions ===
 
-/// Create an empty Blob vector for use in PTBs
+/// Create an empty Blob vector for use in Programmable Transaction Blocks
 /// This is cleaner than creating empty vectors on the client side
 public fun empty_blob_vector(): vector<walrus::blob::Blob> {
     vector::empty<walrus::blob::Blob>()
 }
-
-// === View Functions ===
 
 /// Get vault ID from vault object
 public fun get_vault_id(vault: &PublicationVault): ID {
@@ -140,12 +165,12 @@ public fun get_vault_address(vault: &PublicationVault): address {
     object::uid_to_address(&vault.id)
 }
 
-/// Get blob ID from walrus blob (object ID)
+/// Get blob object ID from walrus blob
 public fun get_blob_object_id(blob: &walrus::blob::Blob): ID {
     walrus::blob::object_id(blob)
 }
 
-/// Get blob content hash from walrus blob
+/// Get blob content hash from walrus blob  
 public fun get_blob_content_id(blob: &walrus::blob::Blob): u256 {
     walrus::blob::blob_id(blob)
 }

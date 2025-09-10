@@ -1,8 +1,6 @@
 #[test_only]
 module contracts::nft_tests {
-    use contracts::nft;
     use contracts::inkray_test_utils as test_utils;
-    use sui::test_scenario;
 
     // === Basic Module Integration Tests ===
 

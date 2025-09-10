@@ -1,8 +1,8 @@
 #[test_only]
+#[allow(unused_let_mut)]
 module contracts::policy_tests {
-    use contracts::policy::{Self, IdV1};
+    use contracts::policy::{Self};
     use contracts::inkray_test_utils as test_utils;
-    use sui::test_scenario;
     use sui::bcs;
 
     // === BCS Parsing Tests ===

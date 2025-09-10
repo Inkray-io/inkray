@@ -1,6 +1,5 @@
 #[test_only]
 module contracts::subscription_tests {
-    use contracts::subscription;
     use contracts::inkray_test_utils as test_utils;
     use sui::test_scenario;
     use sui::clock;

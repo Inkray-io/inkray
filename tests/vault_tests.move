@@ -12,13 +12,13 @@ module contracts::vault_tests {
         let mut scenario = test_utils::begin_scenario(user);
         
         test_utils::next_tx(&mut scenario, user);
-        let (owner_cap, publication_addr) = publication::create(
+        let owner_cap = publication::create(
             test_utils::get_test_publication_name(),
             test_scenario::ctx(&mut scenario)
         );
         
         test_utils::return_to_sender(&scenario, owner_cap);
-        (scenario, publication_addr)
+        (scenario, @0x0)
     }
 
     // === Vault Creation Tests ===
@@ -34,7 +34,7 @@ module contracts::vault_tests {
             
             // Verify vault was created and associated
             let vault_id = publication::get_vault_id(&publication);
-            assert!(vault_id != @0x0, 0); // Vault should exist
+            assert!(vault_id != object::id_from_address(@0x0), 0); // Vault should exist
             
             test_utils::return_shared(publication);
         };
@@ -51,15 +51,15 @@ module contracts::vault_tests {
             let publication = test_utils::take_shared<Publication>(&scenario);
             let vault = test_utils::take_shared<PublicationVault>(&scenario);
             
-            // Verify vault address matches what's stored in publication
-            let expected_vault_addr = publication::get_vault_id(&publication);
-            let actual_vault_addr = vault::get_vault_address(&vault);
-            test_utils::assert_eq(actual_vault_addr, expected_vault_addr);
+            // Verify vault ID matches what's stored in publication
+            let expected_vault_id = publication::get_vault_id(&publication);
+            let actual_vault_id = vault::get_vault_id(&vault);
+            test_utils::assert_eq(actual_vault_id, expected_vault_id);
             
             // Verify publication ID matches in vault
             let (vault_publication_id, asset_count) = vault::get_vault_info(&vault);
-            let actual_publication_addr = publication::get_publication_address(&publication);
-            test_utils::assert_eq(vault_publication_id, actual_publication_addr);
+            let actual_publication_id = publication::get_publication_object_id(&publication);
+            test_utils::assert_eq(vault_publication_id, actual_publication_id);
             
             // Initially no assets should exist
             test_utils::assert_eq(asset_count, 0);
@@ -175,9 +175,9 @@ module contracts::vault_tests {
     }
     
     #[test]
-    #[expected_failure(abort_code = 2)]
+    #[expected_failure(abort_code = 0)]
     fun test_unauthorized_asset_storage() {
-        let (mut scenario, publication_addr) = setup_publication_and_vault(test_utils::creator());
+        let (mut scenario, _publication_addr) = setup_publication_and_vault(test_utils::creator());
         
         test_utils::next_tx(&mut scenario, test_utils::user1()); // Different user
         {
@@ -193,7 +193,7 @@ module contracts::vault_tests {
             
             // Now test with actual function call that should fail
             // We simulate the error by manually asserting what the vault function would check
-            assert!(is_authorized, 2); // E_NOT_AUTHORIZED
+            assert!(is_authorized, 0); // E_NOT_OWNER
             
             test_utils::return_shared(publication);
             test_utils::return_shared(_vault);
@@ -212,7 +212,7 @@ module contracts::vault_tests {
             let _vault = test_utils::take_shared<PublicationVault>(&scenario);
             
             // Test authorization logic - test general authorization structure
-            let owner_caller = tx_context::sender(test_scenario::ctx(&mut scenario));
+            let _owner_caller = tx_context::sender(test_scenario::ctx(&mut scenario));
             
             // Owner access through capability (simulated as always authorized)
             let is_authorized = true;
@@ -262,7 +262,7 @@ module contracts::vault_tests {
     }
     
     #[test]
-    #[expected_failure(abort_code = 2)]
+    #[expected_failure(abort_code = 0)]
     fun test_unauthorized_asset_removal() {
         let (mut scenario, _publication_addr) = setup_publication_and_vault(test_utils::creator());
         
@@ -280,7 +280,7 @@ module contracts::vault_tests {
             assert!(!is_authorized, 0);
             
             // Simulate the error by manually asserting what the vault function would check
-            assert!(is_authorized, 2); // E_NOT_AUTHORIZED
+            assert!(is_authorized, 0); // E_NOT_OWNER
             
             test_utils::return_shared(publication);
             test_utils::return_shared(_vault);
@@ -299,13 +299,13 @@ module contracts::vault_tests {
         {
             let vault = test_utils::take_shared<PublicationVault>(&scenario);
             
-            // Test that get_vault_address returns a valid address
-            let vault_addr = vault::get_vault_address(&vault);
-            assert!(vault_addr != @0x0, 0);
+            // Test that get_vault_id returns a valid ID
+            let vault_id = vault::get_vault_id(&vault);
+            assert!(vault_id != object::id_from_address(@0x0), 0);
             
             // Test that vault info returns consistent data
             let (publication_id, asset_count) = vault::get_vault_info(&vault);
-            assert!(publication_id != @0x0, 0);
+            assert!(publication_id != object::id_from_address(@0x0), 0);
             test_utils::assert_eq(asset_count, 0); // Should be empty initially
             
             test_utils::return_shared(vault);
@@ -322,7 +322,7 @@ module contracts::vault_tests {
         
         // Create first publication by creator
         test_utils::next_tx(&mut scenario, test_utils::creator());
-        let (owner_cap1, publication_addr1) = publication::create(
+        let owner_cap1 = publication::create(
             string::utf8(b"Publication 1"),
             test_scenario::ctx(&mut scenario)
         );
@@ -330,28 +330,27 @@ module contracts::vault_tests {
         
         // Create second publication by contributor (different user)
         test_utils::next_tx(&mut scenario, test_utils::contributor());
-        let (owner_cap2, publication_addr2) = publication::create(
+        let owner_cap2 = publication::create(
             string::utf8(b"Publication 2"),
             test_scenario::ctx(&mut scenario)
         );
         test_utils::return_to_sender(&scenario, owner_cap2);
         
-        // Verify they have different addresses
-        assert!(publication_addr1 != publication_addr2, 0);
+        // Different publications will have different vault addresses (verified below)
         
-        // Get vault addresses from publications and verify they're different
+        // Get vault IDs from publications and verify they're different
         test_utils::next_tx(&mut scenario, test_utils::creator());
         {
             let publication1 = test_utils::take_shared<Publication>(&scenario);
-            let vault_addr1 = publication::get_vault_id(&publication1);
+            let vault_id1 = publication::get_vault_id(&publication1);
             test_utils::return_shared(publication1);
             
             let publication2 = test_utils::take_shared<Publication>(&scenario);  
-            let vault_addr2 = publication::get_vault_id(&publication2);
+            let vault_id2 = publication::get_vault_id(&publication2);
             test_utils::return_shared(publication2);
             
-            // Verify vault addresses are different
-            assert!(vault_addr1 != vault_addr2, 0);
+            // Verify vault IDs are different
+            assert!(vault_id1 != vault_id2, 0);
         };
         
         test_utils::end_scenario(scenario);

@@ -1,38 +1,65 @@
+/// Comprehensive event system for Inkray decentralized blogging platform.
+///
+/// This module defines all events emitted by the platform for off-chain indexing,
+/// analytics, and user interface updates.
 module contracts::inkray_events;
 
 use std::string::String;
 
-// === Publication Events ===
+// === Publication Management Events ===
+
+/// Emitted when a new publication is created
 public struct PublicationCreated has copy, drop {
-    publication: ID,
-    owner: address,
-    name: String,
-    vault_id: ID,
+    publication: ID,    // Publication object ID
+    owner: address,     // Owner address
+    name: String,       // Publication name
+    vault_id: ID,      // Associated vault ID
 }
 
+/// Emitted when a contributor is added to a publication
 public struct ContributorAdded has copy, drop {
-    publication: ID,
-    addr: address,
-    added_by: address,
+    publication: ID,    // Publication object ID
+    addr: address,      // Contributor address
+    added_by: address,  // Address that added the contributor (owner)
 }
 
+/// Emitted when a contributor is removed from a publication
 public struct ContributorRemoved has copy, drop {
-    publication: ID,
-    addr: address,
-    removed_by: address,
+    publication: ID,    // Publication object ID
+    addr: address,      // Contributor address removed
+    removed_by: address, // Address that removed the contributor (owner)
 }
 
-// === Article Events ===
+// === Article Publishing Events ===
+
+/// Emitted when a new article is published
 public struct ArticlePosted has copy, drop {
-    publication: address,
-    article: address,
-    author: address,
-    title: String,
-    gating: u8, // 0 = Free, 1 = Gated
-    asset_count: u64,
+    publication: address,  // Publication address (legacy format)
+    article: address,     // Article address
+    author: address,      // Article author
+    title: String,        // Article title
+    gating: u8,          // 0 = Free, 1 = Gated
+    asset_count: u64,    // Total number of blobs (body + assets)
 }
 
-// === Vault Events ===
+// === Vault Storage Events ===
+
+/// Emitted when a blob is stored in a vault
+public struct BlobStored has copy, drop {
+    vault_id: ID,        // Vault object ID
+    publication_id: ID,  // Publication object ID
+    blob_id: ID,         // Blob object ID
+    stored_by: address,  // Address that stored the blob
+}
+
+/// Emitted when a blob is removed from a vault
+public struct BlobRemoved has copy, drop {
+    vault_id: ID,        // Vault object ID
+    publication_id: ID,  // Publication object ID
+    blob_id: ID,         // Blob object ID
+    removed_by: address, // Address that removed the blob
+}
+
 public struct RenewIntent has copy, drop {
     publication: ID,
     vault: address,
@@ -104,6 +131,34 @@ public fun emit_article_posted(
         title,
         gating,
         asset_count,
+    });
+}
+
+public fun emit_blob_stored(
+    vault_id: ID,
+    publication_id: ID,
+    blob_id: ID,
+    stored_by: address,
+) {
+    sui::event::emit(BlobStored {
+        vault_id,
+        publication_id,
+        blob_id,
+        stored_by,
+    });
+}
+
+public fun emit_blob_removed(
+    vault_id: ID,
+    publication_id: ID,
+    blob_id: ID,
+    removed_by: address,
+) {
+    sui::event::emit(BlobRemoved {
+        vault_id,
+        publication_id,
+        blob_id,
+        removed_by,
     });
 }
 

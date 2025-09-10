@@ -14,7 +14,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -54,7 +54,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -103,7 +103,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -156,7 +156,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -211,7 +211,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -246,7 +246,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -260,7 +260,7 @@ module contracts::publication_tests {
             let mut publication = test_utils::take_shared<Publication>(&scenario);
             
             // Create a different publication by user1 to get a wrong cap
-            let (wrong_cap, _wrong_addr) = publication::create(
+            let wrong_cap = publication::create(
                 string::utf8(b"Wrong Publication"),
                 test_scenario::ctx(&mut scenario)
             );
@@ -289,7 +289,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -335,7 +335,7 @@ module contracts::publication_tests {
         // Create publication
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -372,7 +372,7 @@ module contracts::publication_tests {
         // Test publication creation event
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
@@ -418,7 +418,7 @@ module contracts::publication_tests {
 
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 string::utf8(b""),
                 test_scenario::ctx(&mut scenario)
             );
@@ -449,7 +449,7 @@ module contracts::publication_tests {
 
         test_utils::next_tx(&mut scenario, creator());
         {
-            let (owner_cap, _publication_addr) = publication::create(
+            let owner_cap = publication::create(
                 test_utils::get_test_publication_name(),
                 test_scenario::ctx(&mut scenario)
             );
