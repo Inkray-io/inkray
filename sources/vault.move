@@ -10,8 +10,8 @@ use sui::table::{Self, Table};
 // === Access Control Enum ===
 /// Defines content access levels for articles and blobs
 public enum Access has copy, drop, store {
-    Free,   // Publicly accessible content
-    Gated,  // Premium/paid content requiring authorization
+    Free, // Publicly accessible content
+    Gated, // Premium/paid content requiring authorization
 }
 
 // === Core Data Structures ===
@@ -33,7 +33,6 @@ public struct RenewCap has key, store {
 // === Errors ===
 const E_ASSET_NOT_FOUND: u64 = 0;
 const E_ASSET_EXISTS: u64 = 1;
-
 
 // === Admin Functions ===
 fun init(ctx: &mut TxContext) {
@@ -72,14 +71,16 @@ public(package) fun store_blob(
     stored_by: address,
 ) {
     let blob_id = walrus::blob::object_id(&blob);
+    let blob_content_id = walrus::blob::blob_id(&blob);
     assert!(!table::contains(&vault.blobs, blob_id), E_ASSET_EXISTS);
     table::add(&mut vault.blobs, blob_id, blob);
-    
-    // Emit blob stored event
+
+    // Emit blob stored event with both object ID and content ID
     inkray_events::emit_blob_stored(
         vault.id.to_inner(),
         vault.publication_id,
         blob_id,
+        blob_content_id,
         stored_by,
     );
 }
@@ -93,15 +94,17 @@ public(package) fun remove_blob(
 ): walrus::blob::Blob {
     assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
     let blob = table::remove(&mut vault.blobs, blob_id);
-    
-    // Emit blob removed event
+
+    // Emit blob removed event with both object ID and content ID
+    let blob_content_id = walrus::blob::blob_id(&blob);
     inkray_events::emit_blob_removed(
         vault.id.to_inner(),
         vault.publication_id,
         blob_id,
+        blob_content_id,
         removed_by,
     );
-    
+
     blob
 }
 
@@ -170,7 +173,7 @@ public fun get_blob_object_id(blob: &walrus::blob::Blob): ID {
     walrus::blob::object_id(blob)
 }
 
-/// Get blob content hash from walrus blob  
+/// Get blob content hash from walrus blob
 public fun get_blob_content_id(blob: &walrus::blob::Blob): u256 {
     walrus::blob::blob_id(blob)
 }

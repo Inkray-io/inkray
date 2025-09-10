@@ -46,18 +46,20 @@ public struct ArticlePosted has copy, drop {
 
 /// Emitted when a blob is stored in a vault
 public struct BlobStored has copy, drop {
-    vault_id: ID,        // Vault object ID
-    publication_id: ID,  // Publication object ID
-    blob_id: ID,         // Blob object ID
-    stored_by: address,  // Address that stored the blob
+    vault_id: ID,           // Vault object ID
+    publication_id: ID,     // Publication object ID
+    blob_object_id: ID,     // Blob object ID (Sui object ID)
+    blob_content_id: u256,  // Blob content ID (Walrus blob ID)
+    stored_by: address,     // Address that stored the blob
 }
 
 /// Emitted when a blob is removed from a vault
 public struct BlobRemoved has copy, drop {
-    vault_id: ID,        // Vault object ID
-    publication_id: ID,  // Publication object ID
-    blob_id: ID,         // Blob object ID
-    removed_by: address, // Address that removed the blob
+    vault_id: ID,           // Vault object ID
+    publication_id: ID,     // Publication object ID
+    blob_object_id: ID,     // Blob object ID (Sui object ID)
+    blob_content_id: u256,  // Blob content ID (Walrus blob ID)
+    removed_by: address,    // Address that removed the blob
 }
 
 public struct RenewIntent has copy, drop {
@@ -137,13 +139,15 @@ public fun emit_article_posted(
 public fun emit_blob_stored(
     vault_id: ID,
     publication_id: ID,
-    blob_id: ID,
+    blob_object_id: ID,
+    blob_content_id: u256,
     stored_by: address,
 ) {
     sui::event::emit(BlobStored {
         vault_id,
         publication_id,
-        blob_id,
+        blob_object_id,
+        blob_content_id,
         stored_by,
     });
 }
@@ -151,13 +155,15 @@ public fun emit_blob_stored(
 public fun emit_blob_removed(
     vault_id: ID,
     publication_id: ID,
-    blob_id: ID,
+    blob_object_id: ID,
+    blob_content_id: u256,
     removed_by: address,
 ) {
     sui::event::emit(BlobRemoved {
         vault_id,
         publication_id,
-        blob_id,
+        blob_object_id,
+        blob_content_id,
         removed_by,
     });
 }
