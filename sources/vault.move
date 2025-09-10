@@ -1,267 +1,160 @@
-module contracts::vault {
-    use sui::table::{Self, Table};
-    use contracts::inkray_events;
+module contracts::vault;
 
-    // === Access Enum ===
-    public enum Access has store, drop, copy {
-        Free,
-        Gated
-    }
+use contracts::inkray_events;
+use sui::table::{Self, Table};
 
-    // === StoredAsset Struct ===
-    public struct StoredAsset has store {
-        blob: walrus::blob::Blob,  // canonical Walrus object used for renewals
-        seal_id: vector<u8>,       // BCS-encoded IdV1 bytes used at encryption time
-        // optional metadata
-        sha256: vector<u8>,        // integrity hint
-        mime: vector<u8>,          // display hint
-    }
+// === Access Enum ===
+public enum Access has copy, drop, store {
+    Free,
+    Gated,
+}
 
-    // === PublicationVault (child object) ===
-    public struct PublicationVault has key, store {
-        id: UID,
-        assets: Table<u256, StoredAsset>, // unlimited storage via Table
-        publication_id: address,          // parent publication
-    }
+// === PublicationVault (child object) ===
+public struct PublicationVault has key, store {
+    id: UID,
+    blobs: Table<ID, walrus::blob::Blob>, // unlimited blob storage via Table, keyed by blob object ID
+    publication_id: ID, // parent publication
+}
 
-    // === RenewCap (platform-owned) ===
-    public struct RenewCap has key, store {
-        id: UID,
-    }
+// === RenewCap (platform-owned) ===
+public struct RenewCap has key, store {
+    id: UID,
+}
 
-    // === Errors ===
-    const E_ASSET_NOT_FOUND: u64 = 0;
-    const E_ASSET_EXISTS: u64 = 1;
-    const E_NOT_AUTHORIZED: u64 = 2;
-    const E_WRONG_PUBLICATION: u64 = 3;
-    
-    // === Error Code Access (for tests) ===
-    public fun error_not_authorized(): u64 { E_NOT_AUTHORIZED }
-    public fun error_wrong_publication(): u64 { E_WRONG_PUBLICATION }
-    public fun error_asset_not_found(): u64 { E_ASSET_NOT_FOUND }
-    public fun error_asset_exists(): u64 { E_ASSET_EXISTS }
+// === Errors ===
+const E_ASSET_NOT_FOUND: u64 = 0;
+const E_ASSET_EXISTS: u64 = 1;
 
-    // === Authorization Helpers ===
-    
-    /// Verify caller is authorized for publication vault operations
-    /// This must be called by modules that have access to Publication objects
-    public(package) fun verify_caller_authorization(
-        publication_owner: address,
-        contributors: &vector<address>,
-        caller: address
-    ): bool {
-        caller == publication_owner || vector::contains(contributors, &caller)
-    }
 
-    // === Admin Functions ===
-    fun init(ctx: &mut TxContext) {
-        let renew_cap = RenewCap {
-            id: object::new(ctx),
-        };
-        transfer::transfer(renew_cap, tx_context::sender(ctx));
-    }
+// === Admin Functions ===
+fun init(ctx: &mut TxContext) {
+    let renew_cap = RenewCap {
+        id: object::new(ctx),
+    };
+    transfer::transfer(renew_cap, tx_context::sender(ctx));
+}
 
-    // === Public Functions ===
-    
-    /// Create a new vault as child object 
-    /// Should only be called by authorized modules (e.g., publication.move)
-    public(package) fun create_vault(
-        publication_id: address,
-        ctx: &mut TxContext
-    ): PublicationVault {
-        PublicationVault {
-            id: object::new(ctx),
-            assets: table::new(ctx),
-            publication_id,
-        }
-    }
+// === Public Functions ===
 
-    /// Create vault and share it, returning the address
-    /// Should only be called by authorized modules (e.g., publication.move)
-    public(package) fun create_and_share_vault(
-        publication_id: address,
-        ctx: &mut TxContext
-    ): address {
-        let vault = create_vault(publication_id, ctx);
-        let vault_addr = object::uid_to_address(&vault.id);
-        transfer::share_object(vault);
-        vault_addr
+/// Create a new vault as child object
+/// Should only be called by authorized modules (e.g., publication.move)
+fun create_vault(publication_id: ID, ctx: &mut TxContext): PublicationVault {
+    PublicationVault {
+        id: object::new(ctx),
+        blobs: table::new(ctx),
+        publication_id,
     }
+}
 
-    /// Store asset in vault with authorization check
-    /// The caller must verify authorization before calling this function
-    public(package) fun store_asset_authorized(
-        vault: &mut PublicationVault,
-        asset_id: u256,
-        asset: StoredAsset,
-        vault_publication_id: address,
-        publication_owner: address,
-        contributors: &vector<address>,
-        caller: address
-    ) {
-        // Verify vault belongs to the correct publication
-        assert!(vault.publication_id == vault_publication_id, E_WRONG_PUBLICATION);
-        
-        // Verify caller is authorized (owner or contributor)
-        assert!(
-            verify_caller_authorization(publication_owner, contributors, caller), 
-            E_NOT_AUTHORIZED
-        );
-        
-        assert!(!table::contains(&vault.assets, asset_id), E_ASSET_EXISTS);
-        table::add(&mut vault.assets, asset_id, asset);
-    }
+/// Create vault and share it, returning the ID
+/// Should only be called by authorized modules (e.g., publication.move)
+public(package) fun create_and_share_vault(publication_id: ID, ctx: &mut TxContext): ID {
+    let vault = create_vault(publication_id, ctx);
+    let vault_id = vault.id.to_inner();
+    transfer::share_object(vault);
+    vault_id
+}
 
-    /// Store asset in vault (convenience function for testing)
-    /// NOTE: This should not be used in production - use store_asset_authorized instead
-    public fun store_asset(
-        vault: &mut PublicationVault,
-        asset_id: u256,
-        asset: StoredAsset,
-        _ctx: &TxContext
-    ) {
-        assert!(!table::contains(&vault.assets, asset_id), E_ASSET_EXISTS);
-        table::add(&mut vault.assets, asset_id, asset);
-    }
+/// Store blob in vault
+/// Authorization and vault ownership must be verified by the caller before calling this function
+public(package) fun store_blob(
+    vault: &mut PublicationVault,
+    blob: walrus::blob::Blob,
+) {
+    let blob_id = walrus::blob::object_id(&blob);
+    assert!(!table::contains(&vault.blobs, blob_id), E_ASSET_EXISTS);
+    table::add(&mut vault.blobs, blob_id, blob);
+}
 
-    /// Get asset from vault
-    public fun get_asset(
-        vault: &PublicationVault,
-        asset_id: u256
-    ): &StoredAsset {
-        assert!(table::contains(&vault.assets, asset_id), E_ASSET_NOT_FOUND);
-        table::borrow(&vault.assets, asset_id)
-    }
+/// Remove blob from vault
+/// Authorization and vault ownership must be verified by the caller before calling this function
+public(package) fun remove_blob(
+    vault: &mut PublicationVault,
+    blob_id: ID,
+): walrus::blob::Blob {
+    assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
+    table::remove(&mut vault.blobs, blob_id)
+}
 
-    /// Remove asset from vault with authorization check
-    /// The caller must verify authorization before calling this function
-    public(package) fun remove_asset_authorized(
-        vault: &mut PublicationVault,
-        asset_id: u256,
-        vault_publication_id: address,
-        publication_owner: address,
-        contributors: &vector<address>,
-        caller: address
-    ): StoredAsset {
-        // Verify vault belongs to the correct publication
-        assert!(vault.publication_id == vault_publication_id, E_WRONG_PUBLICATION);
-        
-        // Verify caller is authorized (owner or contributor)
-        assert!(
-            verify_caller_authorization(publication_owner, contributors, caller), 
-            E_NOT_AUTHORIZED
-        );
-        
-        assert!(table::contains(&vault.assets, asset_id), E_ASSET_NOT_FOUND);
-        table::remove(&mut vault.assets, asset_id)
-    }
+/// Check if blob exists
+public fun has_blob(vault: &PublicationVault, blob_id: ID): bool {
+    table::contains(&vault.blobs, blob_id)
+}
 
-    /// Remove asset from vault (convenience function for testing)
-    /// NOTE: This should not be used in production - use remove_asset_authorized instead
-    public fun remove_asset(
-        vault: &mut PublicationVault,
-        asset_id: u256,
-        _ctx: &TxContext
-    ): StoredAsset {
-        assert!(table::contains(&vault.assets, asset_id), E_ASSET_NOT_FOUND);
-        table::remove(&mut vault.assets, asset_id)
-    }
+/// Get blob from vault by blob object ID
+public fun get_blob(vault: &PublicationVault, blob_id: ID): &walrus::blob::Blob {
+    assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
+    table::borrow(&vault.blobs, blob_id)
+}
 
-    /// Check if asset exists
-    public fun has_asset(
-        vault: &PublicationVault,
-        asset_id: u256
-    ): bool {
-        table::contains(&vault.assets, asset_id)
-    }
+/// Renewal function (platform uses RenewCap)
+public fun renew_all(vault: &mut PublicationVault, _cap: &RenewCap) {
+    // TODO: Iterate through assets and call walrus renewal
+    // For now, emit intent for relayer orchestration
+    inkray_events::emit_renew_intent(
+        vault.publication_id,
+        get_vault_address(vault),
+        0, // batch_start
+        0, // batch_len - will be filled by actual implementation
+    );
+}
 
-    /// Renewal function (platform uses RenewCap)
-    public entry fun renew_all(
-        vault: &mut PublicationVault,
-        _cap: &RenewCap
-    ) {
-        // TODO: Iterate through assets and call walrus renewal
-        // For now, emit intent for relayer orchestration
-        inkray_events::emit_renew_intent(
-            vault.publication_id,
-            get_vault_address(vault),
-            0, // batch_start
-            0  // batch_len - will be filled by actual implementation
-        );
-    }
+// === Blob Helper Functions ===
 
-    // === StoredAsset Functions ===
-    
-    /// Create a new StoredAsset
-    public fun new_stored_asset(
-        blob: walrus::blob::Blob,
-        seal_id: vector<u8>,
-        sha256: vector<u8>,
-        mime: vector<u8>
-    ): StoredAsset {
-        StoredAsset {
-            blob,
-            seal_id,
-            sha256,
-            mime,
-        }
-    }
+// === Access Enum Functions ===
+public fun access_free(): Access { Access::Free }
 
-    /// Create StoredAsset with minimal metadata
-    public fun new_stored_asset_minimal(
-        blob: walrus::blob::Blob,
-        seal_id: vector<u8>
-    ): StoredAsset {
-        StoredAsset {
-            blob,
-            seal_id,
-            sha256: vector::empty(),
-            mime: vector::empty(),
-        }
-    }
+public fun access_gated(): Access { Access::Gated }
 
-    // === Access Enum Functions ===
-    public fun access_free(): Access { Access::Free }
-    public fun access_gated(): Access { Access::Gated }
-    
-    public fun is_free(access: &Access): bool {
-        match (access) {
-            Access::Free => true,
-            Access::Gated => false,
-        }
+public fun is_free(access: &Access): bool {
+    match (access) {
+        Access::Free => true,
+        Access::Gated => false,
     }
-    
-    public fun is_gated(access: &Access): bool {
-        match (access) {
-            Access::Free => false,
-            Access::Gated => true,
-        }
-    }
+}
 
-    // === Utility Functions ===
-    
-    /// Create an empty StoredAsset vector for use in PTBs
-    /// This is cleaner than creating empty vectors on the client side
-    public fun empty_stored_asset_vector(): vector<StoredAsset> {
-        vector::empty<StoredAsset>()
+public fun is_gated(access: &Access): bool {
+    match (access) {
+        Access::Free => false,
+        Access::Gated => true,
     }
+}
 
-    // === View Functions ===
-    
-    /// Get vault address from its ID
-    public fun get_vault_address(vault: &PublicationVault): address {
-        object::uid_to_address(&vault.id)
-    }
-    
-    public fun get_stored_asset_info(asset: &StoredAsset): (&walrus::blob::Blob, &vector<u8>, &vector<u8>, &vector<u8>) {
-        (&asset.blob, &asset.seal_id, &asset.sha256, &asset.mime)
-    }
+// === Utility Functions ===
 
-    public fun get_seal_id(asset: &StoredAsset): &vector<u8> {
-        &asset.seal_id
-    }
+/// Create an empty Blob vector for use in PTBs
+/// This is cleaner than creating empty vectors on the client side
+public fun empty_blob_vector(): vector<walrus::blob::Blob> {
+    vector::empty<walrus::blob::Blob>()
+}
 
-    public fun get_vault_info(vault: &PublicationVault): (address, u64) {
-        (vault.publication_id, table::length(&vault.assets))
-    }
+// === View Functions ===
+
+/// Get vault ID from vault object
+public fun get_vault_id(vault: &PublicationVault): ID {
+    vault.id.to_inner()
+}
+
+/// Get vault address from its ID (legacy support)
+public fun get_vault_address(vault: &PublicationVault): address {
+    object::uid_to_address(&vault.id)
+}
+
+/// Get blob ID from walrus blob (object ID)
+public fun get_blob_object_id(blob: &walrus::blob::Blob): ID {
+    walrus::blob::object_id(blob)
+}
+
+/// Get blob content hash from walrus blob
+public fun get_blob_content_id(blob: &walrus::blob::Blob): u256 {
+    walrus::blob::blob_id(blob)
+}
+
+public fun get_vault_info(vault: &PublicationVault): (ID, u64) {
+    (vault.publication_id, table::length(&vault.blobs))
+}
+
+/// Get publication ID from vault
+public fun get_vault_publication_id(vault: &PublicationVault): ID {
+    vault.publication_id
 }

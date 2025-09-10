@@ -50,7 +50,7 @@ module contracts::policy {
     // All functions start with "seal_approve" and take id: vector<u8> as first parameter
     
     /// Free content access - anyone can access
-    public entry fun seal_approve_free(
+    public fun seal_approve_free(
         id: vector<u8>,
         article: &Article
     ) {
@@ -60,7 +60,7 @@ module contracts::policy {
     }
 
     /// NFT holder access - must own the article NFT
-    public entry fun seal_approve_nft(
+    public fun seal_approve_nft(
         id: vector<u8>,
         access_nft: &ArticleAccessNft
     ) {
@@ -69,7 +69,7 @@ module contracts::policy {
     }
 
     /// Publication roles access - owner or contributor
-    public entry fun seal_approve_roles(
+    public fun seal_approve_roles(
         id: vector<u8>,
         publication: &Publication,
         ctx: &TxContext
@@ -78,13 +78,12 @@ module contracts::policy {
         assert!(p.publication == publication::get_publication_address(publication), E_BAD_ID);
         let who = tx_context::sender(ctx);
         
-        // Check if sender is owner or contributor
-        if (publication::is_owner(publication, who)) return;
+        // Check if sender is contributor (owner access requires capability)
         assert!(publication::is_contributor(publication, who), E_ACCESS_DENIED);
     }
 
     /// Platform subscription access - must have active subscription
-    public entry fun seal_approve_subscription(
+    public fun seal_approve_subscription(
         id: vector<u8>,
         sub: &Subscription,
         clock: &Clock
@@ -95,7 +94,7 @@ module contracts::policy {
 
     /// Composite approval (optional) - tries free, then roles only
     /// Keeps arg list minimal by excluding NFT and subscription paths
-    public entry fun seal_approve_any(
+    public fun seal_approve_any(
         id: vector<u8>,
         publication: &Publication,
         article: &Article,
@@ -108,13 +107,9 @@ module contracts::policy {
         // Try free content first
         if (articles::is_free_content(article)) return;
         
-        // Try roles (owner/contributor)
+        // Try contributor role (owner access requires capability)
         let who = tx_context::sender(ctx);
-        if (publication::is_owner(publication, who)) return;
-        if (publication::is_contributor(publication, who)) return;
-        
-        // No access granted
-        assert!(false, E_ACCESS_DENIED);
+        assert!(publication::is_contributor(publication, who), E_ACCESS_DENIED);
     }
 
     // === View Functions ===
