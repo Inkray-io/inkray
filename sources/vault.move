@@ -125,7 +125,7 @@ public fun renew_all(vault: &mut PublicationVault, _cap: &RenewCap) {
     // For now, emit intent for relayer orchestration
     inkray_events::emit_renew_intent(
         vault.publication_id,
-        get_vault_address(vault),
+        get_vault_id(vault),
         0, // batch_start
         0, // batch_len - will be filled by actual implementation
     );

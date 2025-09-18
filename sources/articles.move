@@ -87,22 +87,32 @@ fun post_internal(
     assert!(publication::get_vault_id(publication) == vault_id, E_INVALID_VAULT);
 
     let article_id = object::new(ctx);
-    let article_addr = object::uid_to_address(&article_id);
+    let article_object_id = article_id.to_inner();
 
     // Generate slug from title using article's own ID
     let slug = generate_slug_from_title(title, &article_id);
 
-    // Store body blob in vault
+    // Collect blob IDs and content IDs before storing (for event emission)
     let body_blob_id = vault::get_blob_object_id(&body_blob);
+    let body_content_id = vault::get_blob_content_id(&body_blob);
+    
+    let mut asset_blob_ids = vector::empty<ID>();
+    let mut asset_content_ids = vector::empty<u256>();
+    let mut i = 0;
+    while (i < vector::length(&asset_blobs)) {
+        let asset_blob = vector::borrow(&asset_blobs, i);
+        vector::push_back(&mut asset_blob_ids, vault::get_blob_object_id(asset_blob));
+        vector::push_back(&mut asset_content_ids, vault::get_blob_content_id(asset_blob));
+        i = i + 1;
+    };
+
+    // Store body blob in vault
     publication::store_blob_in_vault(publication, vault, body_blob, ctx);
 
-    // Store additional asset blobs in vault and collect their IDs
-    let mut asset_blob_ids = vector::empty<ID>();
+    // Store additional asset blobs in vault
     while (!vector::is_empty(&asset_blobs)) {
         let blob = vector::pop_back(&mut asset_blobs);
-        let blob_id = vault::get_blob_object_id(&blob);
         publication::store_blob_in_vault(publication, vault, blob, ctx);
-        vector::push_back(&mut asset_blob_ids, blob_id);
     };
     // Destroy the empty asset blobs vector
     vector::destroy_empty(asset_blobs);
@@ -121,12 +131,16 @@ fun post_internal(
 
     // Emit event
     inkray_events::emit_article_posted(
-        publication::get_publication_address(publication), // Use address for event compatibility
-        article_addr,
+        publication_id,
+        vault_id,
+        article_object_id,
         author,
         title,
+        slug,
         access_to_u8(&gating),
         vector::length(&asset_blob_ids) + 1, // +1 for body
+        body_content_id,
+        asset_content_ids,
     );
 
     article

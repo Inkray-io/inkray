@@ -10,23 +10,23 @@ use std::string::String;
 
 /// Emitted when a new publication is created
 public struct PublicationCreated has copy, drop {
-    publication: ID,    // Publication object ID
-    owner: address,     // Owner address
-    name: String,       // Publication name
-    vault_id: ID,      // Associated vault ID
+    publication: ID, // Publication object ID
+    owner: address, // Owner address
+    name: String, // Publication name
+    vault_id: ID, // Associated vault ID
 }
 
 /// Emitted when a contributor is added to a publication
 public struct ContributorAdded has copy, drop {
-    publication: ID,    // Publication object ID
-    addr: address,      // Contributor address
-    added_by: address,  // Address that added the contributor (owner)
+    publication: ID, // Publication object ID
+    addr: address, // Contributor address
+    added_by: address, // Address that added the contributor (owner)
 }
 
 /// Emitted when a contributor is removed from a publication
 public struct ContributorRemoved has copy, drop {
-    publication: ID,    // Publication object ID
-    addr: address,      // Contributor address removed
+    publication: ID, // Publication object ID
+    addr: address, // Contributor address removed
     removed_by: address, // Address that removed the contributor (owner)
 }
 
@@ -34,37 +34,41 @@ public struct ContributorRemoved has copy, drop {
 
 /// Emitted when a new article is published
 public struct ArticlePosted has copy, drop {
-    publication: address,  // Publication address (legacy format)
-    article: address,     // Article address
-    author: address,      // Article author
-    title: String,        // Article title
-    gating: u8,          // 0 = Free, 1 = Gated
-    asset_count: u64,    // Total number of blobs (body + assets)
+    publication: ID,
+    vault: ID,
+    article: ID, // Article address
+    author: address, // Article author
+    title: String, // Article title
+    slug: String,
+    gating: u8, // 0 = Free, 1 = Gated
+    asset_count: u64, // Total number of blobs (body + assets)
+    body: u256,
+    assets: vector<u256>,
 }
 
 // === Vault Storage Events ===
 
 /// Emitted when a blob is stored in a vault
 public struct BlobStored has copy, drop {
-    vault_id: ID,           // Vault object ID
-    publication_id: ID,     // Publication object ID
-    blob_object_id: ID,     // Blob object ID (Sui object ID)
-    blob_content_id: u256,  // Blob content ID (Walrus blob ID)
-    stored_by: address,     // Address that stored the blob
+    vault_id: ID, // Vault object ID
+    publication_id: ID, // Publication object ID
+    blob_object_id: ID, // Blob object ID (Sui object ID)
+    blob_content_id: u256, // Blob content ID (Walrus blob ID)
+    stored_by: address, // Address that stored the blob
 }
 
 /// Emitted when a blob is removed from a vault
 public struct BlobRemoved has copy, drop {
-    vault_id: ID,           // Vault object ID
-    publication_id: ID,     // Publication object ID
-    blob_object_id: ID,     // Blob object ID (Sui object ID)
-    blob_content_id: u256,  // Blob content ID (Walrus blob ID)
-    removed_by: address,    // Address that removed the blob
+    vault_id: ID, // Vault object ID
+    publication_id: ID, // Publication object ID
+    blob_object_id: ID, // Blob object ID (Sui object ID)
+    blob_content_id: u256, // Blob content ID (Walrus blob ID)
+    removed_by: address, // Address that removed the blob
 }
 
 public struct RenewIntent has copy, drop {
     publication: ID,
-    vault: address,
+    vault: ID,
     batch_start: u64,
     batch_len: u64,
 }
@@ -119,20 +123,28 @@ public fun emit_contributor_removed(publication: ID, addr: address, removed_by: 
 }
 
 public fun emit_article_posted(
-    publication: address,
-    article: address,
+    publication: ID,
+    vault: ID,
+    article: ID,
     author: address,
     title: String,
+    slug: String,
     gating: u8,
     asset_count: u64,
+    body: u256,
+    assets: vector<u256>,
 ) {
     sui::event::emit(ArticlePosted {
         publication,
+        vault,
         article,
         author,
         title,
+        slug,
         gating,
         asset_count,
+        body,
+        assets,
     });
 }
 
@@ -168,12 +180,7 @@ public fun emit_blob_removed(
     });
 }
 
-public fun emit_renew_intent(
-    publication: ID,
-    vault: address,
-    batch_start: u64,
-    batch_len: u64,
-) {
+public fun emit_renew_intent(publication: ID, vault: ID, batch_start: u64, batch_len: u64) {
     sui::event::emit(RenewIntent {
         publication,
         vault,

@@ -1,5 +1,5 @@
 /// Publication management module for Inkray decentralized blogging platform.
-/// 
+///
 /// This module handles publication creation, ownership through capabilities,
 /// and contributor management with proper authorization controls.
 module contracts::publication;
@@ -156,20 +156,10 @@ public fun verify_caller_is_contributor(publication: &Publication, caller: addre
     vector::contains(&publication.contributors, &caller)
 }
 
-/// Assert that caller is a contributor
-public fun assert_contributor_access(publication: &Publication, caller: address) {
-    assert!(verify_caller_is_contributor(publication, caller), E_NOT_OWNER);
-}
-
-/// Assert that owner capability matches publication
-public fun assert_owner_access(owner_cap: &PublicationOwnerCap, publication: &Publication) {
-    assert!(verify_owner_cap(owner_cap, publication), E_NOT_OWNER);
-}
-
 // === Authorized Vault Operations ===
 
-/// Store blob in publication vault (contributor only - owners use store_blob_in_vault_as_owner)
-public fun store_blob_in_vault(
+/// Store blob in publication vault (package-level utility, no authorization)
+public(package) fun store_blob_in_vault(
     publication: &Publication,
     vault: &mut vault::PublicationVault,
     blob: walrus::blob::Blob,
@@ -177,9 +167,6 @@ public fun store_blob_in_vault(
 ) {
     let caller = tx_context::sender(ctx);
 
-    // Check contributor authorization
-    assert_contributor_access(publication, caller);
-    
     // Verify vault belongs to this publication
     assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
 
@@ -187,28 +174,8 @@ public fun store_blob_in_vault(
     vault::store_blob(vault, blob, caller);
 }
 
-/// Store blob in publication vault using owner capability
-public fun store_blob_in_vault_as_owner(
-    owner_cap: &PublicationOwnerCap,
-    publication: &Publication,
-    vault: &mut vault::PublicationVault,
-    blob: walrus::blob::Blob,
-    ctx: &TxContext,
-) {
-    let caller = tx_context::sender(ctx);
-    
-    // Check owner authorization
-    assert_owner_access(owner_cap, publication);
-    
-    // Verify vault belongs to this publication
-    assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
-
-    // Store blob in vault (vault will emit the event)
-    vault::store_blob(vault, blob, caller);
-}
-
-/// Remove blob from publication vault (contributor only - owners use remove_blob_from_vault_as_owner)
-public fun remove_blob_from_vault(
+/// Remove blob from publication vault (package-level utility, no authorization)
+public(package) fun remove_blob_from_vault(
     publication: &Publication,
     vault: &mut vault::PublicationVault,
     blob_id: ID,
@@ -216,29 +183,6 @@ public fun remove_blob_from_vault(
 ): walrus::blob::Blob {
     let caller = tx_context::sender(ctx);
 
-    // Check contributor authorization
-    assert_contributor_access(publication, caller);
-    
-    // Verify vault belongs to this publication
-    assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
-
-    // Remove blob from vault (vault will emit the event)
-    vault::remove_blob(vault, blob_id, caller)
-}
-
-/// Remove blob from publication vault using owner capability
-public fun remove_blob_from_vault_as_owner(
-    owner_cap: &PublicationOwnerCap,
-    publication: &Publication,
-    vault: &mut vault::PublicationVault,
-    blob_id: ID,
-    ctx: &TxContext,
-): walrus::blob::Blob {
-    let caller = tx_context::sender(ctx);
-    
-    // Check owner authorization
-    assert_owner_access(owner_cap, publication);
-    
     // Verify vault belongs to this publication
     assert!(vault::get_vault_publication_id(vault) == publication.id.to_inner(), E_NOT_OWNER);
 
