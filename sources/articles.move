@@ -20,15 +20,28 @@ const E_INVALID_VAULT: u64 = 2;
 /// Articles are owned objects that reference blobs stored in shared vaults.
 public struct Article has key, store {
     id: UID,
-    gating: Access,                // Free or Gated (premium) content
-    body_blob_id: ID,             // Object ID of body blob in vault
-    asset_blob_ids: vector<ID>,   // Object IDs of additional asset blobs
+    gating: Access, // Free or Gated (premium) content
+    body_blob_id: ID, // Object ID of body blob in vault
     // Metadata
-    title: String,                // Article title
-    slug: String,                 // URL-friendly slug (auto-generated from title + ID)
-    publication_id: ID,           // Reference to parent publication
-    vault_id: ID,                 // Reference to vault storing the blobs
-    author: address,              // Article author
+    title: String, // Article title
+    slug: String, // URL-friendly slug (auto-generated from title + ID)
+    publication_id: ID, // Reference to parent publication
+    vault_id: ID, // Reference to vault storing the blobs
+    author: address, // Article author
+}
+
+/// Platform capability for posting articles as any user to any publication.
+/// This allows the platform to post articles on behalf of users.
+public struct PostArticleCap has key, store {
+    id: UID,
+}
+
+// === Admin Functions ===
+fun init(ctx: &mut TxContext) {
+    let post_cap = PostArticleCap {
+        id: object::new(ctx),
+    };
+    transfer::transfer(post_cap, tx_context::sender(ctx));
 }
 
 // === Public Functions ===
@@ -40,7 +53,6 @@ public fun post(
     title: String,
     gating: Access,
     body_blob: walrus::blob::Blob,
-    asset_blobs: vector<walrus::blob::Blob>,
     ctx: &mut TxContext,
 ): Article {
     let author = tx_context::sender(ctx);
@@ -48,7 +60,7 @@ public fun post(
     // Verify contributor authorization
     assert!(publication::is_contributor(publication, author), E_NOT_AUTHORIZED);
 
-    post_internal(publication, vault, title, gating, body_blob, asset_blobs, author, ctx)
+    post_internal(publication, vault, title, gating, body_blob, author, ctx)
 }
 
 /// Post article by owner using owner cap with auto-generated slug from title
@@ -59,14 +71,27 @@ public fun post_as_owner(
     title: String,
     gating: Access,
     body_blob: walrus::blob::Blob,
-    asset_blobs: vector<walrus::blob::Blob>,
     ctx: &mut TxContext,
 ): Article {
     // Verify owner cap
     assert!(publication::verify_owner_cap(owner_cap, publication), E_NOT_AUTHORIZED);
 
     let author = tx_context::sender(ctx);
-    post_internal(publication, vault, title, gating, body_blob, asset_blobs, author, ctx)
+    post_internal(publication, vault, title, gating, body_blob, author, ctx)
+}
+
+/// Post article using platform capability as specified user
+public fun post_with_cap(
+    _cap: &PostArticleCap,
+    publication: &Publication,
+    vault: &mut PublicationVault,
+    title: String,
+    gating: Access,
+    body_blob: walrus::blob::Blob,
+    author: address,
+    ctx: &mut TxContext,
+): Article {
+    post_internal(publication, vault, title, gating, body_blob, author, ctx)
 }
 
 /// Internal posting logic
@@ -76,7 +101,6 @@ fun post_internal(
     title: String,
     gating: Access,
     body_blob: walrus::blob::Blob,
-    mut asset_blobs: vector<walrus::blob::Blob>,
     author: address,
     ctx: &mut TxContext,
 ): Article {
@@ -95,33 +119,14 @@ fun post_internal(
     // Collect blob IDs and content IDs before storing (for event emission)
     let body_blob_id = vault::get_blob_object_id(&body_blob);
     let body_content_id = vault::get_blob_content_id(&body_blob);
-    
-    let mut asset_blob_ids = vector::empty<ID>();
-    let mut asset_content_ids = vector::empty<u256>();
-    let mut i = 0;
-    while (i < vector::length(&asset_blobs)) {
-        let asset_blob = vector::borrow(&asset_blobs, i);
-        vector::push_back(&mut asset_blob_ids, vault::get_blob_object_id(asset_blob));
-        vector::push_back(&mut asset_content_ids, vault::get_blob_content_id(asset_blob));
-        i = i + 1;
-    };
 
     // Store body blob in vault
     publication::store_blob_in_vault(publication, vault, body_blob, ctx);
-
-    // Store additional asset blobs in vault
-    while (!vector::is_empty(&asset_blobs)) {
-        let blob = vector::pop_back(&mut asset_blobs);
-        publication::store_blob_in_vault(publication, vault, blob, ctx);
-    };
-    // Destroy the empty asset blobs vector
-    vector::destroy_empty(asset_blobs);
 
     let article = Article {
         id: article_id,
         gating,
         body_blob_id,
-        asset_blob_ids,
         title,
         slug,
         publication_id,
@@ -138,9 +143,8 @@ fun post_internal(
         title,
         slug,
         access_to_u8(&gating),
-        vector::length(&asset_blob_ids) + 1, // +1 for body
         body_content_id,
-        asset_content_ids,
+        body_blob_id,
     );
 
     article
@@ -160,12 +164,9 @@ public fun update_article(
         article.publication_id == publication::get_publication_object_id(publication),
         E_INVALID_PUBLICATION,
     );
-    
+
     // Verify vault consistency
-    assert!(
-        article.vault_id == publication::get_vault_id(publication),
-        E_INVALID_VAULT,
-    );
+    assert!(article.vault_id == publication::get_vault_id(publication), E_INVALID_VAULT);
 
     // Update title and regenerate slug from new title using article's ID
     article.title = new_title;
@@ -176,11 +177,11 @@ public fun update_article(
 
 /// Generate a URL-friendly slug from article title with unique identifier.
 /// Creates lowercase slug with hyphens, removes special characters, and adds unique suffix.
-/// 
+///
 /// # Arguments
 /// * `title` - The article title to convert to a slug
 /// * `article_uid` - The article's UID for generating unique identifier
-/// 
+///
 /// # Returns
 /// URL-friendly string suitable for use in article URLs
 public fun generate_slug_from_title(title: String, article_uid: &UID): String {
@@ -324,7 +325,6 @@ public fun get_article_info(
     ID, // vault_id
     address, // author
     u8, // gating (0=Free, 1=Gated)
-    u64, // blob_count
 ) {
     (
         article.title,
@@ -333,7 +333,6 @@ public fun get_article_info(
         article.vault_id,
         article.author,
         access_to_u8(&article.gating),
-        vector::length(&article.asset_blob_ids) + 1, // +1 for body
     )
 }
 
@@ -343,10 +342,6 @@ public fun get_gating(article: &Article): &Access {
 
 public fun get_body_blob_id(article: &Article): ID {
     article.body_blob_id
-}
-
-public fun get_asset_blob_ids(article: &Article): &vector<ID> {
-    &article.asset_blob_ids
 }
 
 public fun get_publication_id(article: &Article): ID {

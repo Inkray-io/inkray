@@ -41,9 +41,8 @@ public struct ArticlePosted has copy, drop {
     title: String, // Article title
     slug: String,
     gating: u8, // 0 = Free, 1 = Gated
-    asset_count: u64, // Total number of blobs (body + assets)
-    body: u256,
-    assets: vector<u256>,
+    quilt_id: u256,
+    quilt_object_id: ID,
 }
 
 // === Vault Storage Events ===
@@ -130,9 +129,8 @@ public fun emit_article_posted(
     title: String,
     slug: String,
     gating: u8,
-    asset_count: u64,
-    body: u256,
-    assets: vector<u256>,
+    quilt_id: u256,
+    quilt_object_id: ID,
 ) {
     sui::event::emit(ArticlePosted {
         publication,
@@ -142,9 +140,8 @@ public fun emit_article_posted(
         title,
         slug,
         gating,
-        asset_count,
-        body,
-        assets,
+        quilt_id,
+        quilt_object_id,
     });
 }
 
