@@ -22,7 +22,7 @@ export class ArticleUploadFlow {
   constructor(
     private multiWallet: MultiWalletClient,
     private packageId: string
-  ) {}
+  ) { }
 
   /**
    * Upload an article with encryption to Walrus and store in vault
@@ -115,13 +115,13 @@ export class ArticleUploadFlow {
     console.log(chalk.blue('🔐 Encrypting article content...'));
 
     const creatorSealClient = this.multiWallet.getSealClient('creator');
-    
+
     // Generate BCS-encoded IdV1 content ID 
     const contentIdBytes = creatorSealClient.generateArticleContentId(
       publicationId,  // Must pass publication ID for proper IdV1
       articleTitle
     );
-    
+
     try {
       const encryptedContent = await creatorSealClient.encryptContent(content, {
         contentId: contentIdBytes,  // Pass Uint8Array directly
@@ -130,7 +130,7 @@ export class ArticleUploadFlow {
       });
 
       console.log(chalk.green('✅ Content encrypted with Seal'));
-      
+
       return { contentId: contentIdBytes, encryptedContent };
     } catch (error) {
       console.error(chalk.red(`❌ Encryption failed: ${error}`));
@@ -150,10 +150,10 @@ export class ArticleUploadFlow {
 
     // Create a filename for the encrypted content
     const filename = `encrypted_${title.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.dat`;
-    
+
     // Get creator's Sui client for Walrus upload
     const creatorSuiClient = this.multiWallet.getSuiClient('creator');
-    
+
     // Use upload function with creator's specific client
     console.log(chalk.green('✅ Using creator wallet for Walrus upload'));
     console.log(chalk.gray(`  Creator wallet: ${creatorSuiClient.getAddress()}`));
@@ -164,10 +164,10 @@ export class ArticleUploadFlow {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(chalk.blue(`📤 Upload attempt ${attempt}/${maxRetries}...`));
-        
+
         const uploadResult = await uploadBufferWithClient(
-          encryptedContent, 
-          filename, 
+          encryptedContent,
+          filename,
           creatorSuiClient,
           {
             epochs: 1, // Reduced from 10 to minimize WAL cost
@@ -182,9 +182,9 @@ export class ArticleUploadFlow {
         return uploadResult;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        
+
         console.error(chalk.red(`❌ Upload attempt ${attempt}/${maxRetries} failed: ${error}`));
-        
+
         // Check for specific error types that shouldn't be retried
         if (errorMsg.includes('WAL') || errorMsg.includes('insufficient') || errorMsg.includes('balance')) {
           console.error(chalk.red(`💡 WAL Token Issue: The wallet needs WAL tokens to pay for Walrus storage`));
@@ -201,8 +201,8 @@ export class ArticleUploadFlow {
 
         // Calculate delay with exponential backoff: 2s, 4s, 8s, 16s
         const delay = baseDelay * Math.pow(2, attempt - 1);
-        console.log(chalk.yellow(`⏳ Waiting ${delay/1000}s before retry ${attempt + 1}...`));
-        
+        console.log(chalk.yellow(`⏳ Waiting ${delay / 1000}s before retry ${attempt + 1}...`));
+
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -232,7 +232,7 @@ export class ArticleUploadFlow {
     console.log(chalk.gray(`  Walrus Blob Object ID: ${walrusBlobObjectId}`));
 
     const creatorClient = this.multiWallet.getSuiClient('creator');
-    
+
     // Ensure creator has sufficient balance
     await this.multiWallet.ensureSufficientBalance('creator', 1.0);
 
@@ -260,7 +260,7 @@ export class ArticleUploadFlow {
       // Wait for article to be available on-chain before validation
       console.log(chalk.blue('⏳ Waiting for article to be available on-chain...'));
       await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
-      
+
       // Validate the created article
       const isValid = await articleManager.validateArticle(result.articleId, title);
       if (!isValid) {
@@ -294,7 +294,7 @@ export class ArticleUploadFlow {
     try {
       const creatorClient = this.multiWallet.getSuiClient('creator');
       const articleManager = new ArticleManager(creatorClient, this.packageId);
-      
+
       // Check if article exists using ArticleManager
       const exists = await articleManager.articleExists(articleId);
       if (!exists) {
@@ -335,7 +335,7 @@ export class ArticleUploadFlow {
    */
   displayUploadSummary(result: ArticleUploadResult): void {
     console.log(chalk.blue('📊 Article Upload Summary'));
-    console.log(chalk.gray('=' .repeat(50)));
+    console.log(chalk.gray('='.repeat(50)));
     console.log(chalk.white(`Article ID: ${result.articleId}`));
     console.log(chalk.white(`Content ID: ${Array.from(result.contentId).map(b => b.toString(16).padStart(2, '0')).join('')} (${result.contentId.length} bytes)`));
     console.log(chalk.white(`Blob ID: ${result.blobId}`));
