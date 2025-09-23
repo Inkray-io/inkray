@@ -50,7 +50,7 @@ public fun parse_id_v1(id: &vector<u8>): IdV1 {
 
 /// Free content access - anyone can access
 public fun seal_approve_free(id: vector<u8>, article: &Article) {
-    // let _p = parse_id_v1(&id);
+    let _p = parse_id_v1(&id);
     // Article validation happens via the article parameter passed to function
     // Content ID only needs to be valid, not match specific article
     assert!(articles::is_free_content(article), E_ACCESS_DENIED);
