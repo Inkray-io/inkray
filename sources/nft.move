@@ -3,23 +3,21 @@ module contracts::nft;
 use contracts::articles::{Self, Article};
 use contracts::inkray_events;
 use std::string::{Self, String};
-use sui::coin::{Self, Coin};
+use sui::coin::Coin;
 use sui::display;
 use sui::package;
 use sui::sui::SUI;
 
 // === Errors ===
-const E_ONLY_GATED_CONTENT: u64 = 0;
-const E_INSUFFICIENT_PAYMENT: u64 = 1;
-const E_NOT_ADMIN: u64 = 2;
-const E_INVALID_ARTICLE: u64 = 3;
+const E_NOT_ADMIN: u64 = 1;
+const E_INVALID_ARTICLE: u64 = 2;
 
 // === Structs ===
 
 /// Article access NFT (address-owned)
 public struct ArticleAccessNft has key, store {
     id: UID,
-    article: address, // bound to Article object id (as address)
+    article_id: ID, // bound to Article object ID
     title: String,
     author: address,
     minted_at: u64,
@@ -45,18 +43,14 @@ fun init(otw: NFT, ctx: &mut TxContext) {
         string::utf8(b"image_url"),
         string::utf8(b"external_url"),
         string::utf8(b"creator"),
-        string::utf8(b"attributes"),
     ];
 
     let values = vector[
         string::utf8(b"Article Access: {title}"),
         string::utf8(b"Permanent access NFT for gated article: {title}"),
-        string::utf8(b"https://inkray.app/api/nft/{id}/image"),
-        string::utf8(b"https://inkray.app/article/{article}"),
+        string::utf8(b"https://inkray.xyz/api/nft/{id}/image"),
+        string::utf8(b"https://inkray.xyz/article/{article_id}"),
         string::utf8(b"{author}"),
-        string::utf8(
-            b"[{\"trait_type\": \"Article\", \"value\": \"{article}\"}, {\"trait_type\": \"Type\", \"value\": \"Access NFT\"}]",
-        ),
     ];
 
     let publisher = package::claim(otw, ctx);
@@ -71,8 +65,8 @@ fun init(otw: NFT, ctx: &mut TxContext) {
     // Create mint config
     let mint_config = MintConfig {
         id: object::new(ctx),
-        base_price: 10_000_000_000, // 10 SUI in MIST
-        platform_fee_percent: 10, // 10% platform fee
+        base_price: 0, // Free NFT minting
+        platform_fee_percent: 10, // 10% platform fee (not used since price is 0)
         admin: tx_context::sender(ctx),
     };
 
@@ -83,21 +77,20 @@ fun init(otw: NFT, ctx: &mut TxContext) {
 
 // === Public Functions ===
 
-/// Mint article access NFT (only for gated content)
+/// Mint article access NFT for any article - Now free!
 public fun mint(
     recipient: address,
     article: &Article,
-    config: &MintConfig,
-    mut payment: Coin<SUI>,
+    _config: &MintConfig,
+    payment: Coin<SUI>,
     ctx: &mut TxContext,
 ): ArticleAccessNft {
-    // Only gated content can be minted as NFT
-    assert!(articles::is_gated_content(article), E_ONLY_GATED_CONTENT);
+    // Any article can now be minted as NFT
 
-    // Check payment
-    assert!(coin::value(&payment) >= config.base_price, E_INSUFFICIENT_PAYMENT);
+    // NFT minting is now free - return payment to sender
+    transfer::public_transfer(payment, tx_context::sender(ctx));
 
-    let article_addr = articles::get_article_address(article);
+    let article_id = articles::get_article_id(article);
     let (title, _, _, _, author, _) = articles::get_article_info(article);
 
     let nft_id = object::new(ctx);
@@ -106,30 +99,18 @@ public fun mint(
 
     let nft = ArticleAccessNft {
         id: nft_id,
-        article: article_addr,
+        article_id,
         title,
         author,
         minted_at,
     };
 
-    // Handle payment
-    let payment_value = coin::value(&payment);
-    let platform_fee = (payment_value * (config.platform_fee_percent as u64)) / 100;
-
-    if (platform_fee > 0) {
-        let platform_coin = coin::split(&mut payment, platform_fee, ctx);
-        transfer::public_transfer(platform_coin, config.admin);
-    };
-
-    // Rest goes to author
-    transfer::public_transfer(payment, author);
-
-    // Emit event
+    // Emit event (with 0 payment value since it's free)
     inkray_events::emit_article_nft_minted(
-        article_addr,
+        article_id,
         nft_addr,
         recipient,
-        payment_value,
+        0, // Free minting
     );
 
     nft
@@ -142,9 +123,9 @@ public fun transfer_nft(nft: ArticleAccessNft, recipient: address, _ctx: &TxCont
 
 // === Helper Functions ===
 
-/// Check if NFT matches article address
-public fun nft_matches_article(nft: &ArticleAccessNft, article_addr: address): bool {
-    nft.article == article_addr
+/// Check if NFT matches article ID
+public fun nft_matches_article(nft: &ArticleAccessNft, article_id: ID): bool {
+    nft.article_id == article_id
 }
 
 // === Admin Functions ===
@@ -166,13 +147,13 @@ public fun update_mint_config(
 // === View Functions ===
 
 /// Get NFT info
-public fun get_nft_info(nft: &ArticleAccessNft): (address, String, address, u64) {
-    (nft.article, nft.title, nft.author, nft.minted_at)
+public fun get_nft_info(nft: &ArticleAccessNft): (ID, String, address, u64) {
+    (nft.article_id, nft.title, nft.author, nft.minted_at)
 }
 
-/// Get article address from NFT
-public fun get_article_address(nft: &ArticleAccessNft): address {
-    nft.article
+/// Get article ID from NFT
+public fun get_article_id(nft: &ArticleAccessNft): ID {
+    nft.article_id
 }
 
 /// Get mint config info

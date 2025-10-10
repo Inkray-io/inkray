@@ -89,7 +89,7 @@ public struct SubscriptionExtended has copy, drop {
 
 // === NFT Events ===
 public struct ArticleNftMinted has copy, drop {
-    article: address,
+    article_id: ID,
     nft_id: address,
     to: address,
     price_paid: u64,
@@ -215,13 +215,13 @@ public fun emit_subscription_extended(
 }
 
 public fun emit_article_nft_minted(
-    article: address,
+    article_id: ID,
     nft_id: address,
     to: address,
     price_paid: u64,
 ) {
     sui::event::emit(ArticleNftMinted {
-        article,
+        article_id,
         nft_id,
         to,
         price_paid,
