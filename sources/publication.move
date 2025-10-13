@@ -17,11 +17,16 @@ const E_CONTRIBUTOR_EXISTS: u64 = 2;
 
 /// Publication represents a shared blog publication with contributor management.
 /// This is a shared object that multiple contributors can access concurrently.
+/// Now includes embedded treasury for tip management.
 public struct Publication has key, store {
     id: UID,
     name: String,
     contributors: vector<address>, // bounded collection - use vector for small sets
     vault_id: ID, // reference to associated PublicationVault
+    // Embedded treasury fields for tip management
+    tip_balance: sui::balance::Balance<sui::sui::SUI>, // SUI balance from tips
+    total_tips_received: u64, // Total number of tips received
+    total_amount_received: u64, // Total amount in SUI received (in MIST)
 }
 
 /// Owner capability for publication administration.
@@ -47,6 +52,10 @@ public fun create(name: String, ctx: &mut TxContext): PublicationOwnerCap {
         name,
         contributors: vector::empty(),
         vault_id,
+        // Initialize embedded treasury fields
+        tip_balance: sui::balance::zero<sui::sui::SUI>(),
+        total_tips_received: 0,
+        total_amount_received: 0,
     };
 
     let owner_cap = PublicationOwnerCap {
@@ -156,6 +165,22 @@ public fun verify_caller_is_contributor(publication: &Publication, caller: addre
     vector::contains(&publication.contributors, &caller)
 }
 
+// === Treasury View Functions ===
+
+/// Get the current tip balance for a publication (in MIST)
+public fun get_tip_balance(publication: &Publication): u64 {
+    sui::balance::value(&publication.tip_balance)
+}
+
+/// Get treasury statistics for a publication
+public fun get_treasury_stats(publication: &Publication): (u64, u64, u64) {
+    (
+        sui::balance::value(&publication.tip_balance), // current balance
+        publication.total_tips_received,               // total tip count
+        publication.total_amount_received,             // total amount ever received
+    )
+}
+
 // === Authorized Vault Operations ===
 
 /// Store blob in publication vault (package-level utility, no authorization)
@@ -188,4 +213,27 @@ public(package) fun remove_blob_from_vault(
 
     // Remove blob from vault (vault will emit the event)
     vault::remove_blob(vault, blob_id, caller)
+}
+
+// === Package Treasury Functions ===
+
+/// Add tip balance to publication's embedded treasury (package only)
+public(package) fun add_tip_balance(
+    publication: &mut Publication, 
+    payment: sui::balance::Balance<sui::sui::SUI>
+) {
+    let amount = sui::balance::value(&payment);
+    sui::balance::join(&mut publication.tip_balance, payment);
+    publication.total_tips_received = publication.total_tips_received + 1;
+    publication.total_amount_received = publication.total_amount_received + amount;
+}
+
+/// Withdraw from publication's embedded treasury (package only)  
+public(package) fun withdraw_tip_balance(
+    publication: &mut Publication, 
+    amount: u64, 
+    ctx: &mut TxContext
+): sui::coin::Coin<sui::sui::SUI> {
+    let withdrawn_balance = sui::balance::split(&mut publication.tip_balance, amount);
+    sui::coin::from_balance(withdrawn_balance, ctx)
 }

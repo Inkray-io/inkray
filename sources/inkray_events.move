@@ -95,6 +95,20 @@ public struct ArticleNftMinted has copy, drop {
     price_paid: u64,
 }
 
+// === Tipping Events ===
+public struct PublicationTipped has copy, drop {
+    publication_id: ID,
+    tipper: address,
+    amount: u64,
+}
+
+public struct ArticleTipped has copy, drop {
+    article_id: ID,
+    publication_id: ID,
+    tipper: address,
+    amount: u64,
+}
+
 // === Event Emission Functions ===
 public fun emit_publication_created(publication: ID, owner: address, name: String, vault_id: ID) {
     sui::event::emit(PublicationCreated {
@@ -225,5 +239,31 @@ public fun emit_article_nft_minted(
         nft_id,
         to,
         price_paid,
+    });
+}
+
+public fun emit_publication_tipped(
+    publication_id: ID,
+    tipper: address,
+    amount: u64,
+) {
+    sui::event::emit(PublicationTipped {
+        publication_id,
+        tipper,
+        amount,
+    });
+}
+
+public fun emit_article_tipped(
+    article_id: ID,
+    publication_id: ID,
+    tipper: address,
+    amount: u64,
+) {
+    sui::event::emit(ArticleTipped {
+        article_id,
+        publication_id,
+        tipper,
+        amount,
     });
 }
