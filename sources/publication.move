@@ -17,7 +17,7 @@ const E_CONTRIBUTOR_EXISTS: u64 = 2;
 
 /// Publication represents a shared blog publication with contributor management.
 /// This is a shared object that multiple contributors can access concurrently.
-/// Now includes embedded treasury for tip management.
+/// Now includes embedded treasury for tip management and subscription system.
 public struct Publication has key, store {
     id: UID,
     name: String,
@@ -27,6 +27,9 @@ public struct Publication has key, store {
     tip_balance: sui::balance::Balance<sui::sui::SUI>, // SUI balance from tips
     total_tips_received: u64, // Total number of tips received
     total_amount_received: u64, // Total amount in SUI received (in MIST)
+    // Subscription system fields
+    subscription_price: u64, // Monthly subscription price in MIST (0 = no subscription required)
+    subscription_balance: sui::balance::Balance<sui::sui::SUI>, // SUI balance from subscriptions
 }
 
 /// Owner capability for publication administration.
@@ -56,6 +59,9 @@ public fun create(name: String, ctx: &mut TxContext): PublicationOwnerCap {
         tip_balance: sui::balance::zero<sui::sui::SUI>(),
         total_tips_received: 0,
         total_amount_received: 0,
+        // Initialize subscription system fields
+        subscription_price: 0, // No subscription required by default
+        subscription_balance: sui::balance::zero<sui::sui::SUI>(),
     };
 
     let owner_cap = PublicationOwnerCap {
@@ -235,5 +241,70 @@ public(package) fun withdraw_tip_balance(
     ctx: &mut TxContext
 ): sui::coin::Coin<sui::sui::SUI> {
     let withdrawn_balance = sui::balance::split(&mut publication.tip_balance, amount);
+    sui::coin::from_balance(withdrawn_balance, ctx)
+}
+
+// === Subscription System Functions ===
+
+/// Get subscription price for a publication (0 = no subscription required)
+public fun get_subscription_price(publication: &Publication): u64 {
+    publication.subscription_price
+}
+
+/// Get subscription balance for a publication (in MIST)
+public fun get_subscription_balance(publication: &Publication): u64 {
+    sui::balance::value(&publication.subscription_balance)
+}
+
+/// Check if publication requires subscription (price > 0)
+public fun requires_subscription(publication: &Publication): bool {
+    publication.subscription_price > 0
+}
+
+/// Set subscription price (owner only)
+public fun set_subscription_price(
+    owner_cap: &PublicationOwnerCap,
+    publication: &mut Publication,
+    price: u64,
+    ctx: &TxContext,
+) {
+    assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
+    let old_price = publication.subscription_price;
+    publication.subscription_price = price;
+    
+    // Emit event
+    inkray_events::emit_publication_subscription_price_updated(
+        publication.id.to_inner(),
+        old_price,
+        price,
+        tx_context::sender(ctx),
+    );
+}
+
+/// Add subscription payment to publication's balance (package only)
+public(package) fun add_subscription_balance(
+    publication: &mut Publication, 
+    payment: sui::balance::Balance<sui::sui::SUI>
+) {
+    sui::balance::join(&mut publication.subscription_balance, payment);
+}
+
+/// Withdraw subscription balance (owner only)
+public fun withdraw_subscription_balance(
+    owner_cap: &PublicationOwnerCap,
+    publication: &mut Publication, 
+    amount: u64, 
+    ctx: &mut TxContext
+): sui::coin::Coin<sui::sui::SUI> {
+    assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
+    let withdrawn_balance = sui::balance::split(&mut publication.subscription_balance, amount);
+    
+    // Emit event
+    inkray_events::emit_subscription_balance_withdrawn(
+        publication.id.to_inner(),
+        amount,
+        tx_context::sender(ctx),
+    );
+    
     sui::coin::from_balance(withdrawn_balance, ctx)
 }

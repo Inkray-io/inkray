@@ -72,7 +72,7 @@ public struct RenewIntent has copy, drop {
     batch_len: u64,
 }
 
-// === Subscription Events ===
+// === Platform Subscription Events ===
 public struct SubscriptionMinted has copy, drop {
     user: address,
     subscription_id: address,
@@ -85,6 +85,41 @@ public struct SubscriptionExtended has copy, drop {
     subscription_id: address,
     old_expires_ms: u64,
     new_expires_ms: u64,
+}
+
+// === Publication Subscription Events ===
+
+/// Emitted when a user subscribes to a publication
+public struct PublicationSubscriptionCreated has copy, drop {
+    subscription_id: ID, // Subscription object ID
+    publication_id: ID, // Publication object ID
+    subscriber: address, // Subscriber address
+    amount_paid: u64, // Amount paid in MIST
+    expires_at: u64, // Expiry timestamp
+}
+
+/// Emitted when a subscription is extended
+public struct PublicationSubscriptionExtended has copy, drop {
+    subscription_id: ID, // Subscription object ID
+    publication_id: ID, // Publication object ID
+    subscriber: address, // Subscriber address
+    amount_paid: u64, // Additional amount paid in MIST
+    new_expires_at: u64, // New expiry timestamp
+}
+
+/// Emitted when subscription price is updated
+public struct PublicationSubscriptionPriceUpdated has copy, drop {
+    publication_id: ID, // Publication object ID
+    old_price: u64, // Previous price in MIST
+    new_price: u64, // New price in MIST (0 = no subscription required)
+    updated_by: address, // Owner who updated the price
+}
+
+/// Emitted when subscription balance is withdrawn
+public struct SubscriptionBalanceWithdrawn has copy, drop {
+    publication_id: ID, // Publication object ID
+    amount: u64, // Amount withdrawn in MIST
+    withdrawn_by: address, // Owner who withdrew
 }
 
 // === NFT Events ===
@@ -265,5 +300,65 @@ public fun emit_article_tipped(
         publication_id,
         tipper,
         amount,
+    });
+}
+
+// === Publication Subscription Event Emission Functions ===
+
+public fun emit_publication_subscription_created(
+    subscription_id: ID,
+    publication_id: ID,
+    subscriber: address,
+    amount_paid: u64,
+    expires_at: u64,
+) {
+    sui::event::emit(PublicationSubscriptionCreated {
+        subscription_id,
+        publication_id,
+        subscriber,
+        amount_paid,
+        expires_at,
+    });
+}
+
+public fun emit_publication_subscription_extended(
+    subscription_id: ID,
+    publication_id: ID,
+    subscriber: address,
+    amount_paid: u64,
+    new_expires_at: u64,
+) {
+    sui::event::emit(PublicationSubscriptionExtended {
+        subscription_id,
+        publication_id,
+        subscriber,
+        amount_paid,
+        new_expires_at,
+    });
+}
+
+public fun emit_publication_subscription_price_updated(
+    publication_id: ID,
+    old_price: u64,
+    new_price: u64,
+    updated_by: address,
+) {
+    sui::event::emit(PublicationSubscriptionPriceUpdated {
+        publication_id,
+        old_price,
+        new_price,
+        updated_by,
+    });
+}
+
+public fun emit_subscription_balance_withdrawn(
+    publication_id: ID,
+    amount: u64,
+    withdrawn_by: address,
+) {
+    sui::event::emit(SubscriptionBalanceWithdrawn {
+        publication_id,
+        amount,
+        withdrawn_by,
     });
 }
