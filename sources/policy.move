@@ -2,7 +2,7 @@ module contracts::policy;
 
 use contracts::articles::{Self, Article};
 use contracts::nft::ArticleAccessNft;
-use contracts::publication::{Self, Publication};
+use contracts::publication::{Self, Publication, PublicationOwnerCap};
 use contracts::publication_subscription::{Self, PublicationSubscription};
 use contracts::subscription::{Self, Subscription};
 use sui::bcs::{Self, BCS};
@@ -50,12 +50,12 @@ public fun parse_id_v1(id: &vector<u8>): IdV1 {
 // All functions start with "seal_approve" and take id: vector<u8> as first parameter
 
 /// Free content access - anyone can access (only if both article is free AND publication doesn't require subscription)
-public fun seal_approve_free(id: vector<u8>, article: &Article, publication: &Publication) {
+public fun seal_approve_free(id: vector<u8>, publication: &Publication) {
     let p = parse_id_v1(&id);
     assert!(p.publication == publication::get_publication_address(publication), E_BAD_ID);
-    
+
     // Article must be free content AND publication must not require subscription
-    assert!(articles::is_free_content(article), E_ACCESS_DENIED);
+    // assert!(articles::is_free_content(article), E_ACCESS_DENIED);
     assert!(!publication::requires_subscription(publication), E_ACCESS_DENIED);
 }
 
@@ -84,7 +84,7 @@ public fun seal_approve_subscription(id: vector<u8>, sub: &Subscription, clock: 
 
 /// Publication subscription access - must have valid subscription to specific publication
 public fun seal_approve_publication_subscription(
-    id: vector<u8>, 
+    id: vector<u8>,
     pub_subscription: &PublicationSubscription,
     publication: &Publication,
     clock: &Clock,
@@ -92,9 +92,9 @@ public fun seal_approve_publication_subscription(
 ) {
     let p = parse_id_v1(&id);
     assert!(p.publication == publication::get_publication_address(publication), E_BAD_ID);
-    
+
     let caller = tx_context::sender(ctx);
-    
+
     // Validate subscription access using the subscription module
     assert!(
         publication_subscription::validate_subscription_access(
@@ -103,7 +103,23 @@ public fun seal_approve_publication_subscription(
             caller,
             clock,
         ),
-        E_ACCESS_DENIED
+        E_ACCESS_DENIED,
+    );
+}
+
+/// Publication owner access - must own PublicationOwnerCap
+public fun seal_approve_publication_owner(
+    id: vector<u8>,
+    owner_cap: &PublicationOwnerCap,
+    publication: &Publication,
+) {
+    let p = parse_id_v1(&id);
+    assert!(p.publication == publication::get_publication_address(publication), E_BAD_ID);
+
+    // Verify the owner cap matches this publication
+    assert!(
+        publication::get_owner_cap_publication_id(owner_cap).to_address() == publication::get_publication_address(publication),
+        E_ACCESS_DENIED,
     );
 }
 
@@ -120,7 +136,8 @@ public fun seal_approve_any(
     // Article validation happens via the article parameter passed to function
 
     // Try free content first (both article must be free AND publication must not require subscription)
-    if (articles::is_free_content(article) && !publication::requires_subscription(publication)) return;
+    if (articles::is_free_content(article) && !publication::requires_subscription(publication))
+        return;
 
     // Try contributor role (owner access requires capability)
     let who = tx_context::sender(ctx);

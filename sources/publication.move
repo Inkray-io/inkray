@@ -308,3 +308,10 @@ public fun withdraw_subscription_balance(
     
     sui::coin::from_balance(withdrawn_balance, ctx)
 }
+
+// === View Functions ===
+
+/// Get the publication ID from owner capability
+public fun get_owner_cap_publication_id(owner_cap: &PublicationOwnerCap): ID {
+    owner_cap.publication_id
+}
