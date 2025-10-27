@@ -6,6 +6,7 @@ module contracts::vault;
 
 use contracts::inkray_events;
 use sui::table::{Self, Table};
+use sui::coin::Coin;
 
 // === Access Control Enum ===
 /// Defines content access levels for articles and blobs
@@ -119,35 +120,64 @@ public fun get_blob(vault: &PublicationVault, blob_id: ID): &walrus::blob::Blob 
     table::borrow(&vault.blobs, blob_id)
 }
 
-/// Renew all blobs in the vault
+/// Renew multiple blobs in the vault by their IDs
 /// Platform uses RenewCap to authorize renewal operations
-/// Emits intent for off-chain relayer to handle the actual Walrus storage extension
-public fun renew_all(vault: &mut PublicationVault, _cap: &RenewCap) {
-    let blob_count = table::length(&vault.blobs);
+/// Directly calls Walrus system::extend_blob for each blob
+///
+/// Note: Since Sui Table doesn't support iteration, blob IDs must be provided explicitly
+public fun renew_blobs<WAL>(
+    system: &mut walrus::system::System,
+    vault: &mut PublicationVault,
+    blob_ids: vector<ID>,
+    extended_epochs: u32,
+    payment: &mut Coin<WAL>,
+    _cap: &RenewCap,
+) {
+    let mut i = 0;
+    let len = vector::length(&blob_ids);
 
-    // Emit renewal intent for entire vault
-    // Off-chain relayer will process all blobs
+    while (i < len) {
+        let blob_id = *vector::borrow(&blob_ids, i);
+        assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
+
+        // Get mutable reference to blob and extend its storage period
+        let blob = table::borrow_mut(&mut vault.blobs, blob_id);
+        walrus::system::extend_blob(system, blob, extended_epochs, payment);
+
+        i = i + 1;
+    };
+
+    // Emit event for tracking
     inkray_events::emit_renew_intent(
         vault.publication_id,
         get_vault_id(vault),
-        0, // batch_start - start from first blob
-        blob_count, // batch_len - all blobs in vault
+        0,
+        len,
     );
 }
 
 /// Renew a specific blob by its object ID
 /// Platform uses RenewCap to authorize renewal operations
-/// Emits intent for off-chain relayer to handle the actual Walrus storage extension
-public fun renew_blob(vault: &PublicationVault, blob_id: ID, _cap: &RenewCap) {
+/// Directly calls Walrus system::extend_blob to extend the blob's storage period
+public fun renew_blob<WAL>(
+    system: &mut walrus::system::System,
+    vault: &mut PublicationVault,
+    blob_id: ID,
+    extended_epochs: u32,
+    payment: &mut Coin<WAL>,
+    _cap: &RenewCap,
+) {
     // Verify blob exists in vault
     assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
 
-    // Get blob to extract content ID for the event
-    let blob = table::borrow(&vault.blobs, blob_id);
+    // Get mutable reference to blob
+    let blob = table::borrow_mut(&mut vault.blobs, blob_id);
     let blob_content_id = walrus::blob::blob_id(blob);
 
-    // Emit renewal intent for specific blob with full identification
-    // Off-chain relayer will process this single blob using both object ID and content ID
+    // Call Walrus system to extend blob storage period
+    walrus::system::extend_blob(system, blob, extended_epochs, payment);
+
+    // Emit event for tracking
     inkray_events::emit_blob_renew_intent(
         get_vault_id(vault),
         vault.publication_id,

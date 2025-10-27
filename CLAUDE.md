@@ -63,7 +63,8 @@
 - `store_blob<B>()` - Contributors/owners store blob objects with encryption metadata
 - `get_blob<B>()` / `get_blob_is_encrypted<B>()` - Retrieve blobs and metadata
 - `remove_blob<B>()` - Owner-only blob removal with metadata cleanup
-- `update_renewal_epoch<B>()` - Platform renewal using RenewCap
+- `renew_blob<WAL>()` - Renew single blob using Walrus system::extend_blob with WAL payment
+- `renew_blobs<WAL>()` - Batch renew multiple blobs by IDs using Walrus system::extend_blob
 - `needs_renewal<B>()` / `has_blob<B>()` - Status and existence checks
 
 **Shared Vault Architecture**:
@@ -71,6 +72,14 @@
 - Contributors access vault directly with authorization checks
 - Platform manages renewals via RenewCap without blocking contributor access
 - Backend uploads to Walrus, then stores blob objects in shared vaults
+
+**Walrus Renewal Integration** ✅ **IMPLEMENTED**:
+- Direct integration with `walrus::system::extend_blob()` for on-chain renewal
+- Platform holds RenewCap for authorization of renewal operations
+- Requires Walrus System object (shared object) and WAL token payment
+- Single blob renewal via `renew_blob()` for targeted extensions
+- Batch renewal via `renew_blobs()` for efficient multi-blob updates
+- Events emitted for tracking renewal operations off-chain
 
 ### 3. Content Registry (`content_registry.move`)
 **Purpose**: Article metadata and integrated blob storage management
