@@ -119,15 +119,40 @@ public fun get_blob(vault: &PublicationVault, blob_id: ID): &walrus::blob::Blob 
     table::borrow(&vault.blobs, blob_id)
 }
 
-/// Renewal function (platform uses RenewCap)
+/// Renew all blobs in the vault
+/// Platform uses RenewCap to authorize renewal operations
+/// Emits intent for off-chain relayer to handle the actual Walrus storage extension
 public fun renew_all(vault: &mut PublicationVault, _cap: &RenewCap) {
-    // TODO: Iterate through assets and call walrus renewal
-    // For now, emit intent for relayer orchestration
+    let blob_count = table::length(&vault.blobs);
+
+    // Emit renewal intent for entire vault
+    // Off-chain relayer will process all blobs
     inkray_events::emit_renew_intent(
         vault.publication_id,
         get_vault_id(vault),
-        0, // batch_start
-        0, // batch_len - will be filled by actual implementation
+        0, // batch_start - start from first blob
+        blob_count, // batch_len - all blobs in vault
+    );
+}
+
+/// Renew a specific blob by its object ID
+/// Platform uses RenewCap to authorize renewal operations
+/// Emits intent for off-chain relayer to handle the actual Walrus storage extension
+public fun renew_blob(vault: &PublicationVault, blob_id: ID, _cap: &RenewCap) {
+    // Verify blob exists in vault
+    assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
+
+    // Get blob to extract content ID for the event
+    let blob = table::borrow(&vault.blobs, blob_id);
+    let blob_content_id = walrus::blob::blob_id(blob);
+
+    // Emit renewal intent for specific blob with full identification
+    // Off-chain relayer will process this single blob using both object ID and content ID
+    inkray_events::emit_blob_renew_intent(
+        get_vault_id(vault),
+        vault.publication_id,
+        blob_id,
+        blob_content_id,
     );
 }
 

@@ -72,6 +72,14 @@ public struct RenewIntent has copy, drop {
     batch_len: u64,
 }
 
+/// Emitted when a specific blob needs renewal
+public struct BlobRenewIntent has copy, drop {
+    vault_id: ID, // Vault object ID
+    publication_id: ID, // Publication object ID
+    blob_object_id: ID, // Specific blob to renew
+    blob_content_id: u256, // Walrus blob content ID
+}
+
 // === Platform Subscription Events ===
 public struct SubscriptionMinted has copy, drop {
     user: address,
@@ -232,6 +240,20 @@ public fun emit_renew_intent(publication: ID, vault: ID, batch_start: u64, batch
         vault,
         batch_start,
         batch_len,
+    });
+}
+
+public fun emit_blob_renew_intent(
+    vault_id: ID,
+    publication_id: ID,
+    blob_object_id: ID,
+    blob_content_id: u256,
+) {
+    sui::event::emit(BlobRenewIntent {
+        vault_id,
+        publication_id,
+        blob_object_id,
+        blob_content_id,
     });
 }
 

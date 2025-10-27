@@ -314,6 +314,66 @@ module contracts::vault_tests {
         test_utils::end_scenario(scenario);
     }
 
+    // === Renewal Tests ===
+
+    #[test]
+    fun test_renew_all_with_empty_vault() {
+        let (mut scenario, _publication_addr) = setup_publication_and_vault(test_utils::creator());
+
+        test_utils::next_tx(&mut scenario, test_utils::creator());
+        {
+            let renew_cap = test_utils::take_from_sender<vault::RenewCap>(&scenario);
+            let mut vault = test_utils::take_shared<PublicationVault>(&scenario);
+
+            // Should succeed even with empty vault
+            vault::renew_all(&mut vault, &renew_cap);
+
+            test_utils::return_to_sender(&scenario, renew_cap);
+            test_utils::return_shared(vault);
+        };
+
+        test_utils::end_scenario(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = contracts::vault::E_ASSET_NOT_FOUND)]
+    fun test_renew_blob_nonexistent_fails() {
+        let (mut scenario, _publication_addr) = setup_publication_and_vault(test_utils::creator());
+
+        test_utils::next_tx(&mut scenario, test_utils::creator());
+        {
+            let renew_cap = test_utils::take_from_sender<vault::RenewCap>(&scenario);
+            let vault = test_utils::take_shared<PublicationVault>(&scenario);
+
+            // Try to renew a blob that doesn't exist - should fail
+            let nonexistent_id = object::id_from_address(@0x9999);
+            vault::renew_blob(&vault, nonexistent_id, &renew_cap);
+
+            test_utils::return_to_sender(&scenario, renew_cap);
+            test_utils::return_shared(vault);
+        };
+
+        test_utils::end_scenario(scenario);
+    }
+
+    #[test]
+    fun test_vault_info_returns_correct_blob_count() {
+        let (mut scenario, _publication_addr) = setup_publication_and_vault(test_utils::creator());
+
+        test_utils::next_tx(&mut scenario, test_utils::creator());
+        {
+            let vault = test_utils::take_shared<PublicationVault>(&scenario);
+
+            // Verify initial count is zero
+            let (_publication_id, blob_count) = vault::get_vault_info(&vault);
+            test_utils::assert_eq(blob_count, 0);
+
+            test_utils::return_shared(vault);
+        };
+
+        test_utils::end_scenario(scenario);
+    }
+
     // === Integration Tests ===
 
     #[test]
