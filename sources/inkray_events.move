@@ -53,6 +53,7 @@ public struct BlobStored has copy, drop {
     publication_id: ID, // Publication object ID
     blob_object_id: ID, // Blob object ID (Sui object ID)
     blob_content_id: u256, // Blob content ID (Walrus blob ID)
+    end_epoch: u64, // Blob expiration epoch
     stored_by: address, // Address that stored the blob
 }
 
@@ -204,6 +205,7 @@ public fun emit_blob_stored(
     publication_id: ID,
     blob_object_id: ID,
     blob_content_id: u256,
+    end_epoch: u64,
     stored_by: address,
 ) {
     sui::event::emit(BlobStored {
@@ -211,6 +213,7 @@ public fun emit_blob_stored(
         publication_id,
         blob_object_id,
         blob_content_id,
+        end_epoch,
         stored_by,
     });
 }

@@ -5,10 +5,10 @@
 module contracts::vault;
 
 use contracts::inkray_events;
-use sui::table::{Self, Table};
 use sui::coin::Coin;
-use walrus::system::System;
+use sui::table::{Self, Table};
 use walrus::blob;
+use walrus::system::System;
 use walrus::wal::WAL;
 
 // === Access Control Enum ===
@@ -28,16 +28,13 @@ public struct PublicationVault has key, store {
     publication_id: ID, // reference to parent publication
 }
 
-
 // === Errors ===
 const E_ASSET_NOT_FOUND: u64 = 0;
 const E_ASSET_EXISTS: u64 = 1;
 const E_INVALID_EPOCH_EXTENSION: u64 = 2;
 
 // === Admin Functions ===
-fun init(_ctx: &mut TxContext) {
-    // No initialization needed
-}
+fun init(_ctx: &mut TxContext) {}
 
 // === Public Functions ===
 
@@ -69,6 +66,7 @@ public(package) fun store_blob(
 ) {
     let blob_id = walrus::blob::object_id(&blob);
     let blob_content_id = walrus::blob::blob_id(&blob);
+    let end_epoch = (blob::end_epoch(&blob) as u64);
     assert!(!table::contains(&vault.blobs, blob_id), E_ASSET_EXISTS);
     table::add(&mut vault.blobs, blob_id, blob);
 
@@ -78,6 +76,7 @@ public(package) fun store_blob(
         vault.publication_id,
         blob_id,
         blob_content_id,
+        end_epoch,
         stored_by,
     );
 }
@@ -124,22 +123,22 @@ public fun renew_blob(
     extended_epochs: u32,
     payment: &mut Coin<WAL>,
     system: &mut System,
-    ctx: &mut TxContext
+    ctx: &mut TxContext,
 ) {
     // Basic validation
     assert!(extended_epochs > 0, E_INVALID_EPOCH_EXTENSION);
     assert!(table::contains(&vault.blobs, blob_object_id), E_ASSET_NOT_FOUND);
-    
+
     // Get mutable reference to the blob
     let blob = table::borrow_mut(&mut vault.blobs, blob_object_id);
-    
+
     // Call Walrus extend_blob - this will handle payment validation
     walrus::system::extend_blob(system, blob, extended_epochs, payment);
-    
+
     // Get updated expiration epoch from the blob
     let new_expiration_epoch = (blob::end_epoch(blob) as u64);
     let blob_content_id = blob::blob_id(blob);
-    
+
     // Emit renewal event
     inkray_events::emit_blob_renewed(
         vault.publication_id,
