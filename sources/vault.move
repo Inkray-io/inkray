@@ -6,6 +6,10 @@ module contracts::vault;
 
 use contracts::inkray_events;
 use sui::table::{Self, Table};
+use sui::coin::Coin;
+use walrus::system::System;
+use walrus::blob;
+use walrus::wal::WAL;
 
 // === Access Control Enum ===
 /// Defines content access levels for articles and blobs
@@ -24,22 +28,15 @@ public struct PublicationVault has key, store {
     publication_id: ID, // reference to parent publication
 }
 
-/// Platform capability for managing vault renewals.
-/// This allows the platform to renew blob storage without blocking contributor access.
-public struct RenewCap has key, store {
-    id: UID,
-}
 
 // === Errors ===
 const E_ASSET_NOT_FOUND: u64 = 0;
 const E_ASSET_EXISTS: u64 = 1;
+const E_INVALID_EPOCH_EXTENSION: u64 = 2;
 
 // === Admin Functions ===
-fun init(ctx: &mut TxContext) {
-    let renew_cap = RenewCap {
-        id: object::new(ctx),
-    };
-    transfer::transfer(renew_cap, tx_context::sender(ctx));
+fun init(_ctx: &mut TxContext) {
+    // No initialization needed
 }
 
 // === Public Functions ===
@@ -119,15 +116,39 @@ public fun get_blob(vault: &PublicationVault, blob_id: ID): &walrus::blob::Blob 
     table::borrow(&vault.blobs, blob_id)
 }
 
-/// Renewal function (platform uses RenewCap)
-public fun renew_all(vault: &mut PublicationVault, _cap: &RenewCap) {
-    // TODO: Iterate through assets and call walrus renewal
-    // For now, emit intent for relayer orchestration
-    inkray_events::emit_renew_intent(
+/// Renew a specific blob by extending its storage duration
+/// Anyone can call this function by providing sufficient payment
+public fun renew_blob(
+    vault: &mut PublicationVault,
+    blob_object_id: ID,
+    extended_epochs: u32,
+    payment: &mut Coin<WAL>,
+    system: &mut System,
+    ctx: &mut TxContext
+) {
+    // Basic validation
+    assert!(extended_epochs > 0, E_INVALID_EPOCH_EXTENSION);
+    assert!(table::contains(&vault.blobs, blob_object_id), E_ASSET_NOT_FOUND);
+    
+    // Get mutable reference to the blob
+    let blob = table::borrow_mut(&mut vault.blobs, blob_object_id);
+    
+    // Call Walrus extend_blob - this will handle payment validation
+    walrus::system::extend_blob(system, blob, extended_epochs, payment);
+    
+    // Get updated expiration epoch from the blob
+    let new_expiration_epoch = (blob::end_epoch(blob) as u64);
+    let blob_content_id = blob::blob_id(blob);
+    
+    // Emit renewal event
+    inkray_events::emit_blob_renewed(
         vault.publication_id,
-        get_vault_id(vault),
-        0, // batch_start
-        0, // batch_len - will be filled by actual implementation
+        vault.id.to_inner(),
+        blob_object_id,
+        blob_content_id,
+        extended_epochs,
+        new_expiration_epoch,
+        tx_context::sender(ctx),
     );
 }
 

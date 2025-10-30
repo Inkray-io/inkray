@@ -65,11 +65,16 @@ public struct BlobRemoved has copy, drop {
     removed_by: address, // Address that removed the blob
 }
 
-public struct RenewIntent has copy, drop {
+
+/// Emitted when a blob is renewed by extending its storage duration
+public struct BlobRenewed has copy, drop {
     publication: ID,
     vault: ID,
-    batch_start: u64,
-    batch_len: u64,
+    blob_id: ID,           // Blob object ID
+    blob_content_id: u256, // Walrus blob content ID
+    extended_epochs: u32,
+    new_expiration_epoch: u64,
+    renewed_by: address,
 }
 
 // === Platform Subscription Events ===
@@ -226,12 +231,24 @@ public fun emit_blob_removed(
     });
 }
 
-public fun emit_renew_intent(publication: ID, vault: ID, batch_start: u64, batch_len: u64) {
-    sui::event::emit(RenewIntent {
+
+public fun emit_blob_renewed(
+    publication: ID,
+    vault: ID,
+    blob_id: ID,
+    blob_content_id: u256,
+    extended_epochs: u32,
+    new_expiration_epoch: u64,
+    renewed_by: address,
+) {
+    sui::event::emit(BlobRenewed {
         publication,
         vault,
-        batch_start,
-        batch_len,
+        blob_id,
+        blob_content_id,
+        extended_epochs,
+        new_expiration_epoch,
+        renewed_by,
     });
 }
 
