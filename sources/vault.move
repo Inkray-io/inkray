@@ -66,16 +66,18 @@ public(package) fun store_blob(
 ) {
     let blob_id = walrus::blob::object_id(&blob);
     let blob_content_id = walrus::blob::blob_id(&blob);
+    let blob_size = blob::storage(&blob).size();
     let end_epoch = (blob::end_epoch(&blob) as u64);
     assert!(!table::contains(&vault.blobs, blob_id), E_ASSET_EXISTS);
     table::add(&mut vault.blobs, blob_id, blob);
 
-    // Emit blob stored event with both object ID and content ID
+    // Emit blob stored event with size, object ID and content ID
     inkray_events::emit_blob_stored(
         vault.id.to_inner(),
         vault.publication_id,
         blob_id,
         blob_content_id,
+        blob_size,
         end_epoch,
         stored_by,
     );
