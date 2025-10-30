@@ -7,9 +7,9 @@ module contracts::vault;
 use contracts::inkray_events;
 use sui::coin::Coin;
 use sui::table::{Self, Table};
+use wal::wal::WAL;
 use walrus::blob;
 use walrus::system::System;
-use walrus::wal::WAL;
 
 // === Access Control Enum ===
 /// Defines content access levels for articles and blobs
