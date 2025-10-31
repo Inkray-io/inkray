@@ -13,6 +13,8 @@ use std::string::{Self, String};
 const E_NOT_AUTHORIZED: u64 = 0;
 const E_INVALID_PUBLICATION: u64 = 1;
 const E_INVALID_VAULT: u64 = 2;
+const E_ARTICLE_NOT_FROM_PUBLICATION: u64 = 3;
+const E_VAULT_MISMATCH: u64 = 4;
 
 // === Core Data Structures ===
 
@@ -171,6 +173,66 @@ public fun update_article(
     // Update title and regenerate slug from new title using article's ID
     article.title = new_title;
     article.slug = generate_slug_from_title(new_title, &article.id);
+}
+
+/// Delete article by publication owner
+/// Removes blob from vault, deletes it from Walrus, and destroys the article object
+public fun delete_article(
+    owner_cap: &PublicationOwnerCap,
+    publication: &Publication,
+    vault: &mut PublicationVault,
+    article: Article,
+    system: &mut walrus::system::System,
+    ctx: &mut TxContext,
+) {
+    // Verify ownership
+    assert!(publication::verify_owner_cap(owner_cap, publication), E_NOT_AUTHORIZED);
+    
+    // Verify article belongs to this publication
+    assert!(
+        article.publication_id == publication::get_publication_object_id(publication),
+        E_ARTICLE_NOT_FROM_PUBLICATION,
+    );
+    
+    // Verify vault belongs to this publication
+    assert!(article.vault_id == publication::get_vault_id(publication), E_VAULT_MISMATCH);
+    assert!(vault::get_vault_id(vault) == article.vault_id, E_VAULT_MISMATCH);
+    
+    // Destructure article object to extract all needed values
+    let Article {
+        id,
+        gating: _,
+        body_blob_id,
+        title,
+        slug,
+        publication_id,
+        vault_id,
+        author: _,
+    } = article;
+    let article_id = id.to_inner();
+    
+    // Remove blob from vault
+    let blob = publication::remove_blob_from_vault(publication, vault, body_blob_id, ctx);
+    
+    // Delete blob from Walrus system
+    let storage = walrus::system::delete_blob(system, blob);
+    
+    // Destroy the returned storage
+    walrus::storage_resource::destroy(storage);
+    
+    // Destroy the article object
+    object::delete(id);
+    
+    // Emit deletion event
+    inkray_events::emit_article_deleted(
+        publication_id,
+        vault_id,
+        article_id,
+        tx_context::sender(ctx),
+        title,
+        slug,
+        body_blob_id,
+    );
 }
 
 // === Slug Generation System ===

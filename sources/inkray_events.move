@@ -45,6 +45,17 @@ public struct ArticlePosted has copy, drop {
     quilt_object_id: ID,
 }
 
+/// Emitted when an article is deleted
+public struct ArticleDeleted has copy, drop {
+    publication: ID,
+    vault: ID,
+    article: ID,
+    deleted_by: address,
+    title: String,
+    slug: String,
+    body_blob_id: ID,
+}
+
 // === Vault Storage Events ===
 
 /// Emitted when a blob is stored in a vault
@@ -198,6 +209,26 @@ public fun emit_article_posted(
         gating,
         quilt_id,
         quilt_object_id,
+    });
+}
+
+public fun emit_article_deleted(
+    publication: ID,
+    vault: ID,
+    article: ID,
+    deleted_by: address,
+    title: String,
+    slug: String,
+    body_blob_id: ID,
+) {
+    sui::event::emit(ArticleDeleted {
+        publication,
+        vault,
+        article,
+        deleted_by,
+        title,
+        slug,
+        body_blob_id,
     });
 }
 
