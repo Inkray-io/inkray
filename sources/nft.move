@@ -18,8 +18,6 @@ const E_INVALID_ARTICLE: u64 = 2;
 public struct ArticleAccessNft has key, store {
     id: UID,
     article_id: ID, // bound to Article object ID
-    title: String,
-    author: address,
     minted_at: u64,
 }
 
@@ -80,7 +78,7 @@ fun init(otw: NFT, ctx: &mut TxContext) {
 /// Mint article access NFT for any article - Now free!
 public fun mint(
     recipient: address,
-    article: &Article,
+    article_id: ID,
     _config: &MintConfig,
     payment: Coin<SUI>,
     ctx: &mut TxContext,
@@ -90,9 +88,6 @@ public fun mint(
     // NFT minting is now free - return payment to sender
     transfer::public_transfer(payment, tx_context::sender(ctx));
 
-    let article_id = articles::get_article_id(article);
-    let (title, _, _, _, author, _) = articles::get_article_info(article);
-
     let nft_id = object::new(ctx);
     let nft_addr = object::uid_to_address(&nft_id);
     let minted_at = tx_context::epoch_timestamp_ms(ctx);
@@ -100,8 +95,6 @@ public fun mint(
     let nft = ArticleAccessNft {
         id: nft_id,
         article_id,
-        title,
-        author,
         minted_at,
     };
 
@@ -145,11 +138,6 @@ public fun update_mint_config(
 }
 
 // === View Functions ===
-
-/// Get NFT info
-public fun get_nft_info(nft: &ArticleAccessNft): (ID, String, address, u64) {
-    (nft.article_id, nft.title, nft.author, nft.minted_at)
-}
 
 /// Get article ID from NFT
 public fun get_article_id(nft: &ArticleAccessNft): ID {
