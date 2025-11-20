@@ -1,6 +1,6 @@
 module contracts::policy;
 
-use contracts::articles::{Self, Article};
+use contracts::articles::{Self, Article, PostArticleCap};
 use contracts::nft::ArticleAccessNft;
 use contracts::publication::{Self, Publication, PublicationOwnerCap};
 use contracts::publication_subscription::{Self, PublicationSubscription};
@@ -64,6 +64,10 @@ public fun seal_approve_nft(id: vector<u8>, _access_nft: &ArticleAccessNft) {
     let _p = parse_id_v1(&id);
     // Article validation happens via the NFT parameter passed to function
     // Content ID only needs to be valid, NFT ownership is validated by possession
+}
+
+public fun seal_approve_platform(id: vector<u8>, _: &PostArticleCap) {
+    let _p = parse_id_v1(&id);
 }
 
 /// Publication roles access - owner or contributor
