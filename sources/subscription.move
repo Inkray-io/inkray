@@ -8,10 +8,6 @@ module contracts::subscription {
     const E_INVALID_PLAN: u64 = 1;
     const E_NOT_SUBSCRIBER: u64 = 3;
 
-    const PLAN_BASIC: u8 = 0;
-    const PLAN_PREMIUM: u8 = 1;
-    const PLAN_PRO: u8 = 2;
-
     public struct Subscription has key, store {
         id: UID,
         holder: address,
@@ -125,24 +121,7 @@ module contracts::subscription {
         (subscription.holder, subscription.plan, subscription.expires_ms, subscription.version)
     }
 
-    public fun time_until_expiry(subscription: &Subscription, clock: &Clock): u64 {
-        let current_time = clock::timestamp_ms(clock);
-        if (current_time >= subscription.expires_ms) { 0 }
-        else { subscription.expires_ms - current_time }
-    }
-
     public fun get_service_info(service: &PlatformService): (&vector<u64>, u64, address) {
         (&service.monthly_fees, service.duration_ms, service.admin)
-    }
-
-    public fun get_plan_name(plan: u8): vector<u8> {
-        if (plan == PLAN_BASIC) { b"Basic" }
-        else if (plan == PLAN_PREMIUM) { b"Premium" }
-        else if (plan == PLAN_PRO) { b"Pro" }
-        else { b"Unknown" }
-    }
-
-    public fun get_plan_constants(): (u8, u8, u8) {
-        (PLAN_BASIC, PLAN_PREMIUM, PLAN_PRO)
     }
 }

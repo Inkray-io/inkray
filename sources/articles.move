@@ -150,89 +150,47 @@ public fun delete_article(
     );
 }
 
-// === Slug Generation ===
-
 public fun generate_slug_from_title(title: String, article_uid: &UID): String {
-    let cleaned_title = clean_title_string(title);
-    let unique_suffix = uid_to_short_hex(article_uid);
-    let mut slug = cleaned_title;
-    if (string::length(&slug) > 0) {
-        string::append(&mut slug, string::utf8(b"-"));
-    };
-    string::append(&mut slug, unique_suffix);
-    slug
-}
-
-fun clean_title_string(title: String): String {
     let title_bytes = string::as_bytes(&title);
-    let mut result_bytes = vector::empty<u8>();
+    let mut result = vector::empty<u8>();
     let mut i = 0;
     let len = vector::length(title_bytes);
     let mut last_was_hyphen = false;
-
     while (i < len) {
         let byte = *vector::borrow(title_bytes, i);
-        let processed_byte = if (byte >= 65 && byte <= 90) {
-            byte + 32
-        } else if (byte == 32) {
-            45
-        } else if (is_valid_slug_char(byte)) {
-            byte
-        } else {
-            0
-        };
-
-        if (processed_byte != 0) {
-            let is_hyphen = (processed_byte == 45);
-            if (!is_hyphen || !last_was_hyphen) {
-                vector::push_back(&mut result_bytes, processed_byte);
-            };
-            last_was_hyphen = is_hyphen;
+        let p = if (byte >= 65 && byte <= 90) { byte + 32 }
+            else if (byte == 32) { 45 }
+            else if ((byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) || byte == 45) { byte }
+            else { 0 };
+        if (p != 0) {
+            let is_h = (p == 45);
+            if (!is_h || !last_was_hyphen) { vector::push_back(&mut result, p); };
+            last_was_hyphen = is_h;
         };
         i = i + 1;
     };
-
-    if (!vector::is_empty(&result_bytes)) {
-        let last_idx = vector::length(&result_bytes) - 1;
-        if (*vector::borrow(&result_bytes, last_idx) == 45) {
-            vector::pop_back(&mut result_bytes);
-        };
+    if (!vector::is_empty(&result)) {
+        let last_idx = vector::length(&result) - 1;
+        if (*vector::borrow(&result, last_idx) == 45) { vector::pop_back(&mut result); };
     };
-    if (!vector::is_empty(&result_bytes)) {
-        if (*vector::borrow(&result_bytes, 0) == 45) {
-            vector::remove(&mut result_bytes, 0);
-        };
+    if (!vector::is_empty(&result)) {
+        if (*vector::borrow(&result, 0) == 45) { vector::remove(&mut result, 0); };
     };
-
-    string::utf8(result_bytes)
-}
-
-fun is_valid_slug_char(byte: u8): bool {
-    (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) || (byte == 45)
-}
-
-fun uid_to_short_hex(uid: &UID): String {
-    let uid_bytes = object::uid_to_bytes(uid);
-    let mut hex_bytes = vector::empty<u8>();
-    let mut i = 0;
-    while (i < 4 && i < vector::length(&uid_bytes)) {
-        let byte = *vector::borrow(&uid_bytes, i);
-        vector::push_back(&mut hex_bytes, nibble_to_hex_char(byte / 16));
-        vector::push_back(&mut hex_bytes, nibble_to_hex_char(byte % 16));
-        i = i + 1;
+    if (vector::length(&result) > 0) { vector::push_back(&mut result, 45); };
+    let uid_bytes = object::uid_to_bytes(article_uid);
+    let mut j = 0;
+    while (j < 4 && j < vector::length(&uid_bytes)) {
+        let b = *vector::borrow(&uid_bytes, j);
+        vector::push_back(&mut result, if (b / 16 < 10) { 48 + b / 16 } else { 87 + b / 16 });
+        vector::push_back(&mut result, if (b % 16 < 10) { 48 + b % 16 } else { 87 + b % 16 });
+        j = j + 1;
     };
-    string::utf8(hex_bytes)
-}
-
-fun nibble_to_hex_char(nibble: u8): u8 {
-    if (nibble < 10) { 48 + nibble } else { 97 + nibble - 10 }
+    string::utf8(result)
 }
 
 fun access_to_u8(access: &Access): u8 {
     if (vault::is_free(access)) { 0 } else { 1 }
 }
-
-// === View Functions ===
 
 public fun get_article_id(article: &Article): ID {
     article.id.to_inner()
@@ -247,39 +205,4 @@ public fun get_article_info(article: &Article): (String, String, ID, ID, address
         article.title, article.slug, article.publication_id,
         article.vault_id, article.author, access_to_u8(&article.gating),
     )
-}
-
-public fun get_gating(article: &Article): &Access {
-    &article.gating
-}
-
-public fun get_body_blob_id(article: &Article): ID {
-    article.body_blob_id
-}
-
-public fun get_publication_id(article: &Article): ID {
-    article.publication_id
-}
-
-public fun get_vault_id(article: &Article): ID {
-    article.vault_id
-}
-
-public fun get_author(article: &Article): address {
-    article.author
-}
-
-public fun get_title(article: &Article): String {
-    article.title
-}
-
-public fun get_slug(article: &Article): String {
-    article.slug
-}
-
-public fun preview_slug_from_title(title: String, ctx: &mut TxContext): String {
-    let temp_uid = object::new(ctx);
-    let slug = generate_slug_from_title(title, &temp_uid);
-    object::delete(temp_uid);
-    slug
 }

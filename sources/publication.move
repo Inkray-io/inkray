@@ -122,14 +122,6 @@ public fun get_tip_balance(publication: &Publication): u64 {
     sui::balance::value(&publication.tip_balance)
 }
 
-public fun get_treasury_stats(publication: &Publication): (u64, u64, u64) {
-    (
-        sui::balance::value(&publication.tip_balance),
-        publication.total_tips_received,
-        publication.total_amount_received,
-    )
-}
-
 // === Package Functions ===
 
 public(package) fun store_blob_in_vault(

@@ -97,31 +97,6 @@ public fun get_subscription_info(subscription: &PublicationSubscription): (ID, a
     )
 }
 
-public fun get_expires_at(subscription: &PublicationSubscription): u64 {
-    subscription.expires_at
-}
-
-public fun get_publication_id(subscription: &PublicationSubscription): ID {
-    subscription.publication_id
-}
-
-public fun get_subscriber(subscription: &PublicationSubscription): address {
-    subscription.subscriber
-}
-
-public fun is_subscription_for_publication(
-    subscription: &PublicationSubscription,
-    publication: &Publication,
-): bool {
-    subscription.publication_id == publication::get_publication_object_id(publication)
-}
-
-public fun time_until_expiry(subscription: &PublicationSubscription, clock: &Clock): u64 {
-    let current_time = clock::timestamp_ms(clock);
-    if (subscription.expires_at > current_time) { subscription.expires_at - current_time }
-    else { 0 }
-}
-
 public fun validate_subscription_access(
     subscription: &PublicationSubscription,
     publication: &Publication,

@@ -116,10 +116,6 @@ public fun is_gated(access: &Access): bool {
 
 // === View Functions ===
 
-public fun empty_blob_vector(): vector<walrus::blob::Blob> {
-    vector::empty<walrus::blob::Blob>()
-}
-
 public fun get_vault_id(vault: &PublicationVault): ID {
     vault.id.to_inner()
 }
