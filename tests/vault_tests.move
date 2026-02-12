@@ -163,10 +163,10 @@ module contracts::vault_tests {
             let unauthorized = test_utils::user1();
             
             // Test unauthorized access (not a contributor)
-            assert!(!publication::verify_caller_is_contributor(&publication, unauthorized), 0);
+            assert!(!publication::is_contributor(&publication, unauthorized), 0);
             
             // Test non-contributor access
-            assert!(!publication::verify_caller_is_contributor(&publication, contributor), 0);
+            assert!(!publication::is_contributor(&publication, contributor), 0);
             
             test_utils::return_shared(publication);
         };
@@ -188,7 +188,7 @@ module contracts::vault_tests {
             let unauthorized_caller = tx_context::sender(test_scenario::ctx(&mut scenario));
             
             // This should return false - user1 is not authorized as contributor
-            let is_authorized = publication::verify_caller_is_contributor(&publication, unauthorized_caller);
+            let is_authorized = publication::is_contributor(&publication, unauthorized_caller);
             assert!(!is_authorized, 0);
             
             // Now test with actual function call that should fail
@@ -251,7 +251,7 @@ module contracts::vault_tests {
             let contributor_caller = tx_context::sender(test_scenario::ctx(&mut scenario));
             
             // This should succeed - contributor has access
-            let is_authorized = publication::verify_caller_is_contributor(&publication, contributor_caller);
+            let is_authorized = publication::is_contributor(&publication, contributor_caller);
             assert!(is_authorized, 0);
             
             test_utils::return_shared(publication);
@@ -276,7 +276,7 @@ module contracts::vault_tests {
             let unauthorized_caller = tx_context::sender(test_scenario::ctx(&mut scenario));
             
             // This should return false - user1 is not authorized as contributor
-            let is_authorized = publication::verify_caller_is_contributor(&publication, unauthorized_caller);
+            let is_authorized = publication::is_contributor(&publication, unauthorized_caller);
             assert!(!is_authorized, 0);
             
             // Simulate the error by manually asserting what the vault function would check

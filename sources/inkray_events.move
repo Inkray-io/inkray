@@ -1,51 +1,38 @@
-/// Comprehensive event system for Inkray decentralized blogging platform.
-///
-/// This module defines all events emitted by the platform for off-chain indexing,
-/// analytics, and user interface updates.
 module contracts::inkray_events;
 
 use std::string::String;
 
-// === Publication Management Events ===
-
-/// Emitted when a new publication is created
 public struct PublicationCreated has copy, drop {
-    publication: ID, // Publication object ID
-    owner: address, // Owner address
-    name: String, // Publication name
-    vault_id: ID, // Associated vault ID
+    publication: ID,
+    owner: address,
+    name: String,
+    vault_id: ID,
 }
 
-/// Emitted when a contributor is added to a publication
 public struct ContributorAdded has copy, drop {
-    publication: ID, // Publication object ID
-    addr: address, // Contributor address
-    added_by: address, // Address that added the contributor (owner)
+    publication: ID,
+    addr: address,
+    added_by: address,
 }
 
-/// Emitted when a contributor is removed from a publication
 public struct ContributorRemoved has copy, drop {
-    publication: ID, // Publication object ID
-    addr: address, // Contributor address removed
-    removed_by: address, // Address that removed the contributor (owner)
+    publication: ID,
+    addr: address,
+    removed_by: address,
 }
 
-// === Article Publishing Events ===
-
-/// Emitted when a new article is published
 public struct ArticlePosted has copy, drop {
     publication: ID,
     vault: ID,
-    article: ID, // Article address
-    author: address, // Article author
-    title: String, // Article title
+    article: ID,
+    author: address,
+    title: String,
     slug: String,
-    gating: u8, // 0 = Free, 1 = Gated
+    gating: u8,
     quilt_id: u256,
     quilt_object_id: ID,
 }
 
-/// Emitted when an article is deleted
 public struct ArticleDeleted has copy, drop {
     publication: ID,
     vault: ID,
@@ -56,41 +43,34 @@ public struct ArticleDeleted has copy, drop {
     body_blob_id: ID,
 }
 
-// === Vault Storage Events ===
-
-/// Emitted when a blob is stored in a vault
 public struct BlobStored has copy, drop {
-    vault_id: ID, // Vault object ID
-    publication_id: ID, // Publication object ID
-    blob_object_id: ID, // Blob object ID (Sui object ID)
-    blob_content_id: u256, // Blob content ID (Walrus blob ID)
-    size: u64, // Blob size in bytes
-    end_epoch: u64, // Blob expiration epoch
-    stored_by: address, // Address that stored the blob
+    vault_id: ID,
+    publication_id: ID,
+    blob_object_id: ID,
+    blob_content_id: u256,
+    size: u64,
+    end_epoch: u64,
+    stored_by: address,
 }
 
-/// Emitted when a blob is removed from a vault
 public struct BlobRemoved has copy, drop {
-    vault_id: ID, // Vault object ID
-    publication_id: ID, // Publication object ID
-    blob_object_id: ID, // Blob object ID (Sui object ID)
-    blob_content_id: u256, // Blob content ID (Walrus blob ID)
-    removed_by: address, // Address that removed the blob
+    vault_id: ID,
+    publication_id: ID,
+    blob_object_id: ID,
+    blob_content_id: u256,
+    removed_by: address,
 }
 
-
-/// Emitted when a blob is renewed by extending its storage duration
 public struct BlobRenewed has copy, drop {
     publication: ID,
     vault: ID,
-    blob_id: ID,           // Blob object ID
-    blob_content_id: u256, // Walrus blob content ID
+    blob_id: ID,
+    blob_content_id: u256,
     extended_epochs: u32,
     new_expiration_epoch: u64,
     renewed_by: address,
 }
 
-// === Platform Subscription Events ===
 public struct SubscriptionMinted has copy, drop {
     user: address,
     subscription_id: address,
@@ -105,42 +85,35 @@ public struct SubscriptionExtended has copy, drop {
     new_expires_ms: u64,
 }
 
-// === Publication Subscription Events ===
-
-/// Emitted when a user subscribes to a publication
 public struct PublicationSubscriptionCreated has copy, drop {
-    subscription_id: ID, // Subscription object ID
-    publication_id: ID, // Publication object ID
-    subscriber: address, // Subscriber address
-    amount_paid: u64, // Amount paid in MIST
-    expires_at: u64, // Expiry timestamp
+    subscription_id: ID,
+    publication_id: ID,
+    subscriber: address,
+    amount_paid: u64,
+    expires_at: u64,
 }
 
-/// Emitted when a subscription is extended
 public struct PublicationSubscriptionExtended has copy, drop {
-    subscription_id: ID, // Subscription object ID
-    publication_id: ID, // Publication object ID
-    subscriber: address, // Subscriber address
-    amount_paid: u64, // Additional amount paid in MIST
-    new_expires_at: u64, // New expiry timestamp
+    subscription_id: ID,
+    publication_id: ID,
+    subscriber: address,
+    amount_paid: u64,
+    new_expires_at: u64,
 }
 
-/// Emitted when subscription price is updated
 public struct PublicationSubscriptionPriceUpdated has copy, drop {
-    publication_id: ID, // Publication object ID
-    old_price: u64, // Previous price in MIST
-    new_price: u64, // New price in MIST (0 = no subscription required)
-    updated_by: address, // Owner who updated the price
+    publication_id: ID,
+    old_price: u64,
+    new_price: u64,
+    updated_by: address,
 }
 
-/// Emitted when subscription balance is withdrawn
 public struct SubscriptionBalanceWithdrawn has copy, drop {
-    publication_id: ID, // Publication object ID
-    amount: u64, // Amount withdrawn in MIST
-    withdrawn_by: address, // Owner who withdrew
+    publication_id: ID,
+    amount: u64,
+    withdrawn_by: address,
 }
 
-// === NFT Events ===
 public struct ArticleNftMinted has copy, drop {
     article_id: ID,
     nft_id: address,
@@ -148,7 +121,6 @@ public struct ArticleNftMinted has copy, drop {
     price_paid: u64,
 }
 
-// === Tipping Events ===
 public struct PublicationTipped has copy, drop {
     publication_id: ID,
     tipper: address,
@@ -162,257 +134,120 @@ public struct ArticleTipped has copy, drop {
     amount: u64,
 }
 
-// === Event Emission Functions ===
+// === Emit Functions ===
+
 public fun emit_publication_created(publication: ID, owner: address, name: String, vault_id: ID) {
-    sui::event::emit(PublicationCreated {
-        publication,
-        owner,
-        name,
-        vault_id,
-    });
+    sui::event::emit(PublicationCreated { publication, owner, name, vault_id });
 }
 
 public fun emit_contributor_added(publication: ID, addr: address, added_by: address) {
-    sui::event::emit(ContributorAdded {
-        publication,
-        addr,
-        added_by,
-    });
+    sui::event::emit(ContributorAdded { publication, addr, added_by });
 }
 
 public fun emit_contributor_removed(publication: ID, addr: address, removed_by: address) {
-    sui::event::emit(ContributorRemoved {
-        publication,
-        addr,
-        removed_by,
-    });
+    sui::event::emit(ContributorRemoved { publication, addr, removed_by });
 }
 
 public fun emit_article_posted(
-    publication: ID,
-    vault: ID,
-    article: ID,
-    author: address,
-    title: String,
-    slug: String,
-    gating: u8,
-    quilt_id: u256,
-    quilt_object_id: ID,
+    publication: ID, vault: ID, article: ID, author: address,
+    title: String, slug: String, gating: u8, quilt_id: u256, quilt_object_id: ID,
 ) {
     sui::event::emit(ArticlePosted {
-        publication,
-        vault,
-        article,
-        author,
-        title,
-        slug,
-        gating,
-        quilt_id,
-        quilt_object_id,
+        publication, vault, article, author, title, slug, gating, quilt_id, quilt_object_id,
     });
 }
 
 public fun emit_article_deleted(
-    publication: ID,
-    vault: ID,
-    article: ID,
-    deleted_by: address,
-    title: String,
-    slug: String,
-    body_blob_id: ID,
+    publication: ID, vault: ID, article: ID, deleted_by: address,
+    title: String, slug: String, body_blob_id: ID,
 ) {
     sui::event::emit(ArticleDeleted {
-        publication,
-        vault,
-        article,
-        deleted_by,
-        title,
-        slug,
-        body_blob_id,
+        publication, vault, article, deleted_by, title, slug, body_blob_id,
     });
 }
 
 public fun emit_blob_stored(
-    vault_id: ID,
-    publication_id: ID,
-    blob_object_id: ID,
-    blob_content_id: u256,
-    size: u64,
-    end_epoch: u64,
-    stored_by: address,
+    vault_id: ID, publication_id: ID, blob_object_id: ID,
+    blob_content_id: u256, size: u64, end_epoch: u64, stored_by: address,
 ) {
     sui::event::emit(BlobStored {
-        vault_id,
-        publication_id,
-        blob_object_id,
-        blob_content_id,
-        size,
-        end_epoch,
-        stored_by,
+        vault_id, publication_id, blob_object_id, blob_content_id, size, end_epoch, stored_by,
     });
 }
 
 public fun emit_blob_removed(
-    vault_id: ID,
-    publication_id: ID,
-    blob_object_id: ID,
-    blob_content_id: u256,
-    removed_by: address,
+    vault_id: ID, publication_id: ID, blob_object_id: ID,
+    blob_content_id: u256, removed_by: address,
 ) {
     sui::event::emit(BlobRemoved {
-        vault_id,
-        publication_id,
-        blob_object_id,
-        blob_content_id,
-        removed_by,
+        vault_id, publication_id, blob_object_id, blob_content_id, removed_by,
     });
 }
 
-
 public fun emit_blob_renewed(
-    publication: ID,
-    vault: ID,
-    blob_id: ID,
-    blob_content_id: u256,
-    extended_epochs: u32,
-    new_expiration_epoch: u64,
-    renewed_by: address,
+    publication: ID, vault: ID, blob_id: ID, blob_content_id: u256,
+    extended_epochs: u32, new_expiration_epoch: u64, renewed_by: address,
 ) {
     sui::event::emit(BlobRenewed {
-        publication,
-        vault,
-        blob_id,
-        blob_content_id,
-        extended_epochs,
-        new_expiration_epoch,
-        renewed_by,
+        publication, vault, blob_id, blob_content_id,
+        extended_epochs, new_expiration_epoch, renewed_by,
     });
 }
 
 public fun emit_subscription_minted(
-    user: address,
-    subscription_id: address,
-    plan: u8,
-    expires_ms: u64,
+    user: address, subscription_id: address, plan: u8, expires_ms: u64,
 ) {
-    sui::event::emit(SubscriptionMinted {
-        user,
-        subscription_id,
-        plan,
-        expires_ms,
-    });
+    sui::event::emit(SubscriptionMinted { user, subscription_id, plan, expires_ms });
 }
 
 public fun emit_subscription_extended(
-    user: address,
-    subscription_id: address,
-    old_expires_ms: u64,
-    new_expires_ms: u64,
+    user: address, subscription_id: address, old_expires_ms: u64, new_expires_ms: u64,
 ) {
-    sui::event::emit(SubscriptionExtended {
-        user,
-        subscription_id,
-        old_expires_ms,
-        new_expires_ms,
-    });
+    sui::event::emit(SubscriptionExtended { user, subscription_id, old_expires_ms, new_expires_ms });
 }
 
-public fun emit_article_nft_minted(
-    article_id: ID,
-    nft_id: address,
-    to: address,
-    price_paid: u64,
-) {
-    sui::event::emit(ArticleNftMinted {
-        article_id,
-        nft_id,
-        to,
-        price_paid,
-    });
+public fun emit_article_nft_minted(article_id: ID, nft_id: address, to: address, price_paid: u64) {
+    sui::event::emit(ArticleNftMinted { article_id, nft_id, to, price_paid });
 }
 
-public fun emit_publication_tipped(
-    publication_id: ID,
-    tipper: address,
-    amount: u64,
-) {
-    sui::event::emit(PublicationTipped {
-        publication_id,
-        tipper,
-        amount,
-    });
+public fun emit_publication_tipped(publication_id: ID, tipper: address, amount: u64) {
+    sui::event::emit(PublicationTipped { publication_id, tipper, amount });
 }
 
 public fun emit_article_tipped(
-    article_id: ID,
-    publication_id: ID,
-    tipper: address,
-    amount: u64,
+    article_id: ID, publication_id: ID, tipper: address, amount: u64,
 ) {
-    sui::event::emit(ArticleTipped {
-        article_id,
-        publication_id,
-        tipper,
-        amount,
-    });
+    sui::event::emit(ArticleTipped { article_id, publication_id, tipper, amount });
 }
 
-// === Publication Subscription Event Emission Functions ===
-
 public fun emit_publication_subscription_created(
-    subscription_id: ID,
-    publication_id: ID,
-    subscriber: address,
-    amount_paid: u64,
-    expires_at: u64,
+    subscription_id: ID, publication_id: ID, subscriber: address,
+    amount_paid: u64, expires_at: u64,
 ) {
     sui::event::emit(PublicationSubscriptionCreated {
-        subscription_id,
-        publication_id,
-        subscriber,
-        amount_paid,
-        expires_at,
+        subscription_id, publication_id, subscriber, amount_paid, expires_at,
     });
 }
 
 public fun emit_publication_subscription_extended(
-    subscription_id: ID,
-    publication_id: ID,
-    subscriber: address,
-    amount_paid: u64,
-    new_expires_at: u64,
+    subscription_id: ID, publication_id: ID, subscriber: address,
+    amount_paid: u64, new_expires_at: u64,
 ) {
     sui::event::emit(PublicationSubscriptionExtended {
-        subscription_id,
-        publication_id,
-        subscriber,
-        amount_paid,
-        new_expires_at,
+        subscription_id, publication_id, subscriber, amount_paid, new_expires_at,
     });
 }
 
 public fun emit_publication_subscription_price_updated(
-    publication_id: ID,
-    old_price: u64,
-    new_price: u64,
-    updated_by: address,
+    publication_id: ID, old_price: u64, new_price: u64, updated_by: address,
 ) {
     sui::event::emit(PublicationSubscriptionPriceUpdated {
-        publication_id,
-        old_price,
-        new_price,
-        updated_by,
+        publication_id, old_price, new_price, updated_by,
     });
 }
 
 public fun emit_subscription_balance_withdrawn(
-    publication_id: ID,
-    amount: u64,
-    withdrawn_by: address,
+    publication_id: ID, amount: u64, withdrawn_by: address,
 ) {
-    sui::event::emit(SubscriptionBalanceWithdrawn {
-        publication_id,
-        amount,
-        withdrawn_by,
-    });
+    sui::event::emit(SubscriptionBalanceWithdrawn { publication_id, amount, withdrawn_by });
 }

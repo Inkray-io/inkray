@@ -167,17 +167,9 @@ module contracts::policy_tests {
 
     #[test]
     fun test_policy_constants() {
-        // Test that policy constants are properly defined
-        
-        // Test TAG_ARTICLE_CONTENT constant
-        let expected_tag = 0u8;
-        let actual_tag = policy::get_tag_article_content();
-        assert!(actual_tag == expected_tag, 0);
-        
-        // Test ID_VERSION_V1 constant
-        let expected_version = 1u16;
-        let actual_version = policy::get_id_version_v1();
-        assert!(actual_version == expected_version, 0);
+        let (actual_tag, actual_version) = policy::get_constants();
+        assert!(actual_tag == 0u8, 0);
+        assert!(actual_version == 1u16, 0);
     }
 
     #[test]
