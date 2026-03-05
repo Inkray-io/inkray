@@ -94,18 +94,6 @@ public fun get_vault_id(publication: &Publication): ID {
     publication.vault_id
 }
 
-public fun get_contributors(publication: &Publication): &vector<address> {
-    &publication.contributors
-}
-
-public fun get_name(publication: &Publication): String {
-    publication.name
-}
-
-public fun get_publication_id(owner_cap: &PublicationOwnerCap): ID {
-    owner_cap.publication_id
-}
-
 public fun get_publication_object_id(publication: &Publication): ID {
     publication.id.to_inner()
 }
@@ -171,12 +159,22 @@ public fun get_subscription_price(publication: &Publication): u64 {
     publication.subscription_price
 }
 
-public fun get_subscription_balance(publication: &Publication): u64 {
-    sui::balance::value(&publication.subscription_balance)
-}
-
 public fun requires_subscription(publication: &Publication): bool {
     publication.subscription_price > 0
+}
+
+public fun update_name(
+    owner_cap: &PublicationOwnerCap,
+    publication: &mut Publication,
+    new_name: String,
+    ctx: &TxContext,
+) {
+    assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
+    let old_name = publication.name;
+    publication.name = new_name;
+    inkray_events::emit_publication_name_updated(
+        publication.id.to_inner(), old_name, new_name, tx_context::sender(ctx),
+    );
 }
 
 public fun set_subscription_price(

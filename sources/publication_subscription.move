@@ -65,7 +65,7 @@ public fun extend_subscription(
 ) {
     let subscriber = tx_context::sender(ctx);
     let subscription_price = publication::get_subscription_price(publication);
-    let _current_time = clock::timestamp_ms(clock);
+    let current_time = clock::timestamp_ms(clock);
 
     assert!(subscription.subscriber == subscriber, E_INVALID_PAYMENT);
     assert!(subscription.publication_id == publication::get_publication_object_id(publication), E_INVALID_PAYMENT);
@@ -75,7 +75,12 @@ public fun extend_subscription(
     let months_paid = payment_amount / subscription_price;
     assert!(months_paid > 0, E_ZERO_DURATION);
 
-    subscription.expires_at = subscription.expires_at + (months_paid * MILLISECONDS_PER_MONTH);
+    let base_time = if (subscription.expires_at > current_time) {
+        subscription.expires_at
+    } else {
+        current_time
+    };
+    subscription.expires_at = base_time + (months_paid * MILLISECONDS_PER_MONTH);
     publication::add_subscription_balance(publication, coin::into_balance(payment));
 
     inkray_events::emit_publication_subscription_extended(
@@ -88,13 +93,6 @@ public fun extend_subscription(
 
 public fun is_subscription_valid(subscription: &PublicationSubscription, clock: &Clock): bool {
     subscription.expires_at > clock::timestamp_ms(clock)
-}
-
-public fun get_subscription_info(subscription: &PublicationSubscription): (ID, address, u64, u64, ID) {
-    (
-        subscription.publication_id, subscription.subscriber,
-        subscription.expires_at, subscription.created_at, subscription.id.to_inner(),
-    )
 }
 
 public fun validate_subscription_access(

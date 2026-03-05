@@ -57,12 +57,9 @@ module contracts::vault_tests {
             test_utils::assert_eq(actual_vault_id, expected_vault_id);
             
             // Verify publication ID matches in vault
-            let (vault_publication_id, asset_count) = vault::get_vault_info(&vault);
+            let vault_publication_id = vault::get_vault_publication_id(&vault);
             let actual_publication_id = publication::get_publication_object_id(&publication);
             test_utils::assert_eq(vault_publication_id, actual_publication_id);
-            
-            // Initially no assets should exist
-            test_utils::assert_eq(asset_count, 0);
             
             test_utils::return_shared(publication);
             test_utils::return_shared(vault);
@@ -73,29 +70,6 @@ module contracts::vault_tests {
 
     // === Asset Existence Tests ===
 
-    #[test]
-    fun test_has_blob_empty_vault() {
-        let (mut scenario, _publication_addr) = setup_publication_and_vault(test_utils::creator());
-        
-        test_utils::next_tx(&mut scenario, test_utils::creator());
-        {
-            let vault = test_utils::take_shared<PublicationVault>(&scenario);
-            
-            // Check that nonexistent blobs return false (using sample IDs)
-            let sample_id1 = object::id_from_address(@0x123);
-            let sample_id2 = object::id_from_address(@0x456);
-            let sample_id3 = object::id_from_address(@0x999);
-            
-            assert!(!vault::has_blob(&vault, sample_id1), 0);
-            assert!(!vault::has_blob(&vault, sample_id2), 0);
-            assert!(!vault::has_blob(&vault, sample_id3), 0);
-            
-            test_utils::return_shared(vault);
-        };
-        
-        test_utils::end_scenario(scenario);
-    }
-
     // === Access Control Tests ===
 
     #[test]
@@ -103,48 +77,22 @@ module contracts::vault_tests {
         // Test creating Free access
         let free_access = vault::access_free();
         assert!(vault::is_free(&free_access), 0);
-        assert!(!vault::is_gated(&free_access), 0);
-        
+
         // Test creating Gated access
         let gated_access = vault::access_gated();
         assert!(!vault::is_free(&gated_access), 0);
-        assert!(vault::is_gated(&gated_access), 0);
     }
 
     #[test]
     fun test_access_enum_properties() {
         let free_access = vault::access_free();
         let gated_access = vault::access_gated();
-        
-        // Test that free is not gated and vice versa
-        assert!(vault::is_free(&free_access) != vault::is_gated(&free_access), 0);
-        assert!(vault::is_free(&gated_access) != vault::is_gated(&gated_access), 0);
-        
+
         // Test that different access types have different properties
         assert!(vault::is_free(&free_access) != vault::is_free(&gated_access), 0);
-        assert!(vault::is_gated(&free_access) != vault::is_gated(&gated_access), 0);
     }
 
     // === Error Condition Tests ===
-
-    #[test]
-    #[expected_failure(abort_code = contracts::vault::E_ASSET_NOT_FOUND)]
-    fun test_get_nonexistent_blob_fails() {
-        let (mut scenario, _publication_addr) = setup_publication_and_vault(test_utils::creator());
-        
-        test_utils::next_tx(&mut scenario, test_utils::creator());
-        {
-            let vault = test_utils::take_shared<PublicationVault>(&scenario);
-            
-            // Try to get blob that doesn't exist - should fail
-            let sample_id = object::id_from_address(@0x9999);
-            let _blob = vault::get_blob(&vault, sample_id);
-            
-            test_utils::return_shared(vault);
-        };
-        
-        test_utils::end_scenario(scenario);
-    }
 
     // NOTE: test_remove_nonexistent_asset_fails removed due to StoredAsset lacking drop ability
     // The expected failure test cannot handle the return value properly
@@ -303,10 +251,9 @@ module contracts::vault_tests {
             let vault_id = vault::get_vault_id(&vault);
             assert!(vault_id != object::id_from_address(@0x0), 0);
             
-            // Test that vault info returns consistent data
-            let (publication_id, asset_count) = vault::get_vault_info(&vault);
+            // Test that vault publication ID is valid
+            let publication_id = vault::get_vault_publication_id(&vault);
             assert!(publication_id != object::id_from_address(@0x0), 0);
-            test_utils::assert_eq(asset_count, 0); // Should be empty initially
             
             test_utils::return_shared(vault);
         };

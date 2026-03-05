@@ -71,15 +71,6 @@ public(package) fun remove_blob(
     blob
 }
 
-public fun has_blob(vault: &PublicationVault, blob_id: ID): bool {
-    table::contains(&vault.blobs, blob_id)
-}
-
-public fun get_blob(vault: &PublicationVault, blob_id: ID): &walrus::blob::Blob {
-    assert!(table::contains(&vault.blobs, blob_id), E_ASSET_NOT_FOUND);
-    table::borrow(&vault.blobs, blob_id)
-}
-
 public fun renew_blob(
     vault: &mut PublicationVault,
     blob_object_id: ID,
@@ -110,10 +101,6 @@ public fun is_free(access: &Access): bool {
     match (access) { Access::Free => true, Access::Gated => false }
 }
 
-public fun is_gated(access: &Access): bool {
-    match (access) { Access::Free => false, Access::Gated => true }
-}
-
 // === View Functions ===
 
 public fun get_vault_id(vault: &PublicationVault): ID {
@@ -126,10 +113,6 @@ public fun get_blob_object_id(blob: &walrus::blob::Blob): ID {
 
 public fun get_blob_content_id(blob: &walrus::blob::Blob): u256 {
     walrus::blob::blob_id(blob)
-}
-
-public fun get_vault_info(vault: &PublicationVault): (ID, u64) {
-    (vault.publication_id, table::length(&vault.blobs))
 }
 
 public fun get_vault_publication_id(vault: &PublicationVault): ID {

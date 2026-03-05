@@ -192,8 +192,7 @@ module contracts::inkray_test_utils {
         publication: &contracts::publication::Publication,
         contributor_addr: address
     ) {
-        let contributors = contracts::publication::get_contributors(publication);
-        assert!(vector::contains(contributors, &contributor_addr), 0);
+        assert!(contracts::publication::is_contributor(publication, contributor_addr), 0);
     }
 
     // Note: Subscription helper functions removed until subscription module is fully integrated

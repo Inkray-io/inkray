@@ -50,12 +50,9 @@ module contracts::articles_tests {
         // Test that access enums work with articles view functions
         let free_access = vault::access_free();
         let gated_access = vault::access_gated();
-        
+
         // Verify access type detection
         assert!(vault::is_free(&free_access), 0);
-        assert!(!vault::is_gated(&free_access), 0);
-        
-        assert!(vault::is_gated(&gated_access), 0);
         assert!(!vault::is_free(&gated_access), 0);
     }
 
@@ -123,11 +120,10 @@ module contracts::articles_tests {
             let actual_vault_id = vault::get_vault_id(&vault);
             test_utils::assert_eq(actual_vault_id, expected_vault_id);
             
-            // Verify vault is empty initially
-            let (vault_pub_id, asset_count) = vault::get_vault_info(&vault);
+            // Verify vault publication ID matches
+            let vault_pub_id = vault::get_vault_publication_id(&vault);
             let pub_id = publication::get_publication_object_id(&publication);
             test_utils::assert_eq(vault_pub_id, pub_id);
-            test_utils::assert_eq(asset_count, 0);
             
             test_utils::return_shared(publication);
             test_utils::return_shared(vault);
@@ -232,7 +228,7 @@ module contracts::articles_tests {
         
         // Test access type functions work
         assert!(vault::is_free(&free_access), 0);
-        assert!(vault::is_gated(&gated_access), 0);
+        assert!(!vault::is_free(&gated_access), 0);
     }
 
     #[test]

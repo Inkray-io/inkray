@@ -29,51 +29,6 @@ module contracts::nft_tests {
         test_utils::end_scenario(scenario);
     }
 
-    #[test]
-    fun test_transfer_function_exists() {
-        // Test that transfer_nft function is available
-        // This confirms the API exists for transferring NFTs
-        
-        let _scenario = test_utils::begin_scenario(test_utils::creator());
-        
-        // We can't create actual NFTs without articles, but we can verify
-        // that the transfer function exists and has the correct signature
-        // by checking it compiles when referenced
-        
-        // Note: nft::transfer_nft would be called with actual NFT objects
-        // This test confirms the function exists in the module
-        
-        test_utils::end_scenario(_scenario);
-    }
-
-    // === Configuration Management Tests ===
-    // Note: These tests document what would be tested with MintConfig
-    // when it becomes available through proper initialization
-
-    #[test] 
-    fun test_config_management_api() {
-        // Test that configuration management functions exist
-        let mut scenario = test_utils::begin_scenario(test_utils::admin());
-        
-        test_utils::next_tx(&mut scenario, test_utils::admin());
-        {
-            // The following functions exist and would work with a real MintConfig:
-            // - nft::update_mint_config() for admin configuration updates
-            // - nft::get_mint_config() for reading configuration
-            // This test verifies the API is properly defined
-            
-            // Test basic logic that would be used in config validation
-            let max_fee = 100u8;
-            let test_fee = 50u8;
-            assert!(test_fee <= max_fee, 0);
-            
-            let zero_fee = 0u8;
-            assert!(zero_fee <= max_fee, 0);
-        };
-        
-        test_utils::end_scenario(scenario);
-    }
-
     // === Price and Fee Calculation Tests ===
 
     #[test]
@@ -163,12 +118,6 @@ module contracts::nft_tests {
         {
             // The following functions should be available:
             // - nft::mint() for creating NFTs
-            // - nft::transfer_nft() for transfers 
-            // - nft::update_mint_config() for admin functions
-            // - nft::get_mint_config() for reading config
-            // - nft::get_nft_info() for NFT metadata
-            // - nft::get_article_address() for article binding
-            // - nft::nft_matches_article() for validation
             
             // This test passes if the module compiles with all expected functions
             assert!(true, 0);

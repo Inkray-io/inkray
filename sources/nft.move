@@ -7,8 +7,7 @@ use sui::display;
 use sui::package;
 use sui::sui::SUI;
 
-const E_NOT_ADMIN: u64 = 1;
-const E_INVALID_ARTICLE: u64 = 2;
+
 
 public struct ArticleAccessNft has key, store {
     id: UID,
@@ -75,30 +74,3 @@ public fun mint(
     nft
 }
 
-public fun transfer_nft(nft: ArticleAccessNft, recipient: address, _ctx: &TxContext) {
-    transfer::public_transfer(nft, recipient);
-}
-
-public fun nft_matches_article(nft: &ArticleAccessNft, article_id: ID): bool {
-    nft.article_id == article_id
-}
-
-public fun update_mint_config(
-    config: &mut MintConfig,
-    new_base_price: u64,
-    new_platform_fee_percent: u8,
-    ctx: &TxContext,
-) {
-    assert!(tx_context::sender(ctx) == config.admin, E_NOT_ADMIN);
-    assert!(new_platform_fee_percent <= 100, E_INVALID_ARTICLE);
-    config.base_price = new_base_price;
-    config.platform_fee_percent = new_platform_fee_percent;
-}
-
-public fun get_article_id(nft: &ArticleAccessNft): ID {
-    nft.article_id
-}
-
-public fun get_mint_config(config: &MintConfig): (u64, u8, address) {
-    (config.base_price, config.platform_fee_percent, config.admin)
-}

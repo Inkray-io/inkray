@@ -45,10 +45,6 @@ public fun seal_approve_free(id: vector<u8>, publication: &Publication) {
     assert!(!publication::requires_subscription(publication), E_ACCESS_DENIED);
 }
 
-public fun seal_approve_nft(id: vector<u8>, _access_nft: &ArticleAccessNft) {
-    let _p = parse_id_v1(&id);
-}
-
 public fun seal_approve_platform(id: vector<u8>, _: &PostArticleCap) {
     let _p = parse_id_v1(&id);
 }
@@ -58,11 +54,6 @@ public fun seal_approve_roles(id: vector<u8>, publication: &Publication, ctx: &T
     assert!(p.publication == publication::get_publication_address(publication), E_BAD_ID);
     let who = tx_context::sender(ctx);
     assert!(publication::is_contributor(publication, who), E_ACCESS_DENIED);
-}
-
-public fun seal_approve_subscription(id: vector<u8>, sub: &Subscription, clock: &Clock) {
-    let _p = parse_id_v1(&id);
-    assert!(subscription::is_valid(sub, clock), E_ACCESS_DENIED);
 }
 
 public fun seal_approve_publication_subscription(
@@ -77,7 +68,10 @@ public fun seal_approve_publication_subscription(
     let caller = tx_context::sender(ctx);
     assert!(
         publication_subscription::validate_subscription_access(
-            pub_subscription, publication, caller, clock,
+            pub_subscription,
+            publication,
+            caller,
+            clock,
         ),
         E_ACCESS_DENIED,
     );
@@ -94,20 +88,6 @@ public fun seal_approve_publication_owner(
         publication::get_owner_cap_publication_id(owner_cap).to_address() == publication::get_publication_address(publication),
         E_ACCESS_DENIED,
     );
-}
-
-public fun seal_approve_any(
-    id: vector<u8>,
-    publication: &Publication,
-    article: &Article,
-    ctx: &TxContext,
-) {
-    let p = parse_id_v1(&id);
-    assert!(p.publication == publication::get_publication_address(publication), E_BAD_ID);
-    if (articles::is_free_content(article) && !publication::requires_subscription(publication))
-        return;
-    let who = tx_context::sender(ctx);
-    assert!(publication::is_contributor(publication, who), E_ACCESS_DENIED);
 }
 
 // === View Functions ===

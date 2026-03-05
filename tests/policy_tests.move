@@ -11,155 +11,114 @@ module contracts::policy_tests {
     fun test_bcs_parsing_valid_id() {
         // Test valid IdV1 BCS parsing
         let mut scenario = test_utils::begin_scenario(test_utils::admin());
-        
+
         test_utils::next_tx(&mut scenario, test_utils::admin());
         {
-            // Create a valid IdV1 BCS encoding
+            // Create a valid IdV1 BCS encoding (tag, version, publication, nonce)
             let tag = 0u8;        // TAG_ARTICLE_CONTENT
             let version = 1u16;   // ID_VERSION_V1
             let publication = @0x123;
-            let article = @0x456;
             let nonce = 789u64;
-            
-            // Encode using BCS
+
             let mut encoded = vector::empty<u8>();
-            
-            // Create proper BCS encoding
             let mut tag_bytes = bcs::to_bytes(&tag);
             let mut version_bytes = bcs::to_bytes(&version);
             let mut publication_bytes = bcs::to_bytes(&publication);
-            let mut article_bytes = bcs::to_bytes(&article);
             let mut nonce_bytes = bcs::to_bytes(&nonce);
-            
-            // Concatenate bytes
+
             vector::append(&mut encoded, tag_bytes);
             vector::append(&mut encoded, version_bytes);
             vector::append(&mut encoded, publication_bytes);
-            vector::append(&mut encoded, article_bytes);
             vector::append(&mut encoded, nonce_bytes);
-            
+
             // Parse the encoded data
             let parsed = policy::parse_id_v1(&encoded);
-            let (parsed_tag, parsed_version, parsed_publication, parsed_article, parsed_nonce) = 
+            let (parsed_tag, parsed_version, parsed_publication, parsed_nonce) =
                 policy::get_id_v1_fields(&parsed);
-            
+
             // Verify parsed values match original
             assert!(parsed_tag == tag, 0);
             assert!(parsed_version == version, 0);
             assert!(parsed_publication == publication, 0);
-            assert!(parsed_article == article, 0);
             assert!(parsed_nonce == nonce, 0);
         };
-        
+
         test_utils::end_scenario(scenario);
     }
 
     #[test]
     #[expected_failure(abort_code = contracts::policy::E_WRONG_TAG)]
     fun test_bcs_parsing_wrong_tag() {
-        // Test BCS parsing with wrong tag
         let mut scenario = test_utils::begin_scenario(test_utils::admin());
-        
+
         test_utils::next_tx(&mut scenario, test_utils::admin());
         {
-            // Create invalid IdV1 with wrong tag
-            let wrong_tag = 99u8;  // Invalid tag
+            let wrong_tag = 99u8;
             let version = 1u16;
             let publication = @0x123;
-            let article = @0x456;
             let nonce = 789u64;
-            
+
             let mut encoded = vector::empty<u8>();
-            let mut tag_bytes = bcs::to_bytes(&wrong_tag);
-            let mut version_bytes = bcs::to_bytes(&version);
-            let mut publication_bytes = bcs::to_bytes(&publication);
-            let mut article_bytes = bcs::to_bytes(&article);
-            let mut nonce_bytes = bcs::to_bytes(&nonce);
-            
-            vector::append(&mut encoded, tag_bytes);
-            vector::append(&mut encoded, version_bytes);
-            vector::append(&mut encoded, publication_bytes);
-            vector::append(&mut encoded, article_bytes);
-            vector::append(&mut encoded, nonce_bytes);
-            
-            // This should fail with E_WRONG_TAG
+            vector::append(&mut encoded, bcs::to_bytes(&wrong_tag));
+            vector::append(&mut encoded, bcs::to_bytes(&version));
+            vector::append(&mut encoded, bcs::to_bytes(&publication));
+            vector::append(&mut encoded, bcs::to_bytes(&nonce));
+
             let _parsed = policy::parse_id_v1(&encoded);
         };
-        
+
         test_utils::end_scenario(scenario);
     }
 
     #[test]
     #[expected_failure(abort_code = contracts::policy::E_WRONG_VERSION)]
     fun test_bcs_parsing_wrong_version() {
-        // Test BCS parsing with wrong version
         let mut scenario = test_utils::begin_scenario(test_utils::admin());
-        
+
         test_utils::next_tx(&mut scenario, test_utils::admin());
         {
             let tag = 0u8;
-            let wrong_version = 2u16;  // Invalid version
+            let wrong_version = 2u16;
             let publication = @0x123;
-            let article = @0x456;
             let nonce = 789u64;
-            
+
             let mut encoded = vector::empty<u8>();
-            let mut tag_bytes = bcs::to_bytes(&tag);
-            let mut version_bytes = bcs::to_bytes(&wrong_version);
-            let mut publication_bytes = bcs::to_bytes(&publication);
-            let mut article_bytes = bcs::to_bytes(&article);
-            let mut nonce_bytes = bcs::to_bytes(&nonce);
-            
-            vector::append(&mut encoded, tag_bytes);
-            vector::append(&mut encoded, version_bytes);
-            vector::append(&mut encoded, publication_bytes);
-            vector::append(&mut encoded, article_bytes);
-            vector::append(&mut encoded, nonce_bytes);
-            
-            // This should fail with E_WRONG_VERSION
+            vector::append(&mut encoded, bcs::to_bytes(&tag));
+            vector::append(&mut encoded, bcs::to_bytes(&wrong_version));
+            vector::append(&mut encoded, bcs::to_bytes(&publication));
+            vector::append(&mut encoded, bcs::to_bytes(&nonce));
+
             let _parsed = policy::parse_id_v1(&encoded);
         };
-        
+
         test_utils::end_scenario(scenario);
     }
 
     #[test]
     #[expected_failure(abort_code = contracts::policy::E_TRAILING)]
     fun test_bcs_parsing_trailing_bytes() {
-        // Test BCS parsing with trailing bytes
         let mut scenario = test_utils::begin_scenario(test_utils::admin());
-        
+
         test_utils::next_tx(&mut scenario, test_utils::admin());
         {
             let tag = 0u8;
             let version = 1u16;
             let publication = @0x123;
-            let article = @0x456;
             let nonce = 789u64;
-            
+
             let mut encoded = vector::empty<u8>();
-            let mut tag_bytes = bcs::to_bytes(&tag);
-            let mut version_bytes = bcs::to_bytes(&version);
-            let mut publication_bytes = bcs::to_bytes(&publication);
-            let mut article_bytes = bcs::to_bytes(&article);
-            let mut nonce_bytes = bcs::to_bytes(&nonce);
-            
-            vector::append(&mut encoded, tag_bytes);
-            vector::append(&mut encoded, version_bytes);
-            vector::append(&mut encoded, publication_bytes);
-            vector::append(&mut encoded, article_bytes);
-            vector::append(&mut encoded, nonce_bytes);
-            
+            vector::append(&mut encoded, bcs::to_bytes(&tag));
+            vector::append(&mut encoded, bcs::to_bytes(&version));
+            vector::append(&mut encoded, bcs::to_bytes(&publication));
+            vector::append(&mut encoded, bcs::to_bytes(&nonce));
+
             // Add trailing bytes
             vector::push_back(&mut encoded, 0xDE);
             vector::push_back(&mut encoded, 0xAD);
-            vector::push_back(&mut encoded, 0xBE);
-            vector::push_back(&mut encoded, 0xEF);
-            
-            // This should fail with E_TRAILING
+
             let _parsed = policy::parse_id_v1(&encoded);
         };
-        
+
         test_utils::end_scenario(scenario);
     }
 
@@ -228,32 +187,28 @@ module contracts::policy_tests {
             let tag = 0u8;
             let version = 1u16;
             let publication = @0xABC;
-            let article = @0xDEF;
             let nonce = 12345u64;
-            
+
             let mut encoded = vector::empty<u8>();
             let mut tag_bytes = bcs::to_bytes(&tag);
             let mut version_bytes = bcs::to_bytes(&version);
             let mut publication_bytes = bcs::to_bytes(&publication);
-            let mut article_bytes = bcs::to_bytes(&article);
             let mut nonce_bytes = bcs::to_bytes(&nonce);
-            
+
             vector::append(&mut encoded, tag_bytes);
             vector::append(&mut encoded, version_bytes);
             vector::append(&mut encoded, publication_bytes);
-            vector::append(&mut encoded, article_bytes);
             vector::append(&mut encoded, nonce_bytes);
-            
+
             let parsed = policy::parse_id_v1(&encoded);
-            
+
             // Test field access functions
-            let (field_tag, field_version, field_publication, field_article, field_nonce) = 
+            let (field_tag, field_version, field_publication, field_nonce) =
                 policy::get_id_v1_fields(&parsed);
-            
+
             assert!(field_tag == tag, 0);
             assert!(field_version == version, 0);
             assert!(field_publication == publication, 0);
-            assert!(field_article == article, 0);
             assert!(field_nonce == nonce, 0);
         };
         
@@ -325,22 +280,19 @@ module contracts::policy_tests {
                 let mut tag_bytes = bcs::to_bytes(&tag);
                 let mut version_bytes = bcs::to_bytes(&version);
                 let mut pub_bytes = bcs::to_bytes(&addr);
-                let mut art_bytes = bcs::to_bytes(&addr);
                 let mut nonce_bytes = bcs::to_bytes(&nonce);
-                
+
                 vector::append(&mut encoded, tag_bytes);
                 vector::append(&mut encoded, version_bytes);
                 vector::append(&mut encoded, pub_bytes);
-                vector::append(&mut encoded, art_bytes);
                 vector::append(&mut encoded, nonce_bytes);
-                
+
                 // Should parse successfully
                 let parsed = policy::parse_id_v1(&encoded);
-                let (_, _, parsed_publication, parsed_article, parsed_nonce) = 
+                let (_, _, parsed_publication, parsed_nonce) =
                     policy::get_id_v1_fields(&parsed);
-                
+
                 assert!(parsed_publication == addr, 0);
-                assert!(parsed_article == addr, 0);
                 assert!(parsed_nonce == (i as u64), 0);
                 
                 i = i + 1;

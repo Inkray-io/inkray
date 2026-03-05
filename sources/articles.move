@@ -31,33 +31,6 @@ fun init(ctx: &mut TxContext) {
     transfer::transfer(post_cap, tx_context::sender(ctx));
 }
 
-public fun post(
-    publication: &Publication,
-    vault: &mut PublicationVault,
-    title: String,
-    gating: Access,
-    body_blob: walrus::blob::Blob,
-    ctx: &mut TxContext,
-): Article {
-    let author = tx_context::sender(ctx);
-    assert!(publication::is_contributor(publication, author), E_NOT_AUTHORIZED);
-    post_internal(publication, vault, title, gating, body_blob, author, ctx)
-}
-
-public fun post_as_owner(
-    owner_cap: &PublicationOwnerCap,
-    publication: &Publication,
-    vault: &mut PublicationVault,
-    title: String,
-    gating: Access,
-    body_blob: walrus::blob::Blob,
-    ctx: &mut TxContext,
-): Article {
-    assert!(publication::verify_owner_cap(owner_cap, publication), E_NOT_AUTHORIZED);
-    let author = tx_context::sender(ctx);
-    post_internal(publication, vault, title, gating, body_blob, author, ctx)
-}
-
 public fun post_with_cap(
     _cap: &PostArticleCap,
     publication: &Publication,

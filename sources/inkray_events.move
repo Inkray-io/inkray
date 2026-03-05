@@ -108,6 +108,13 @@ public struct PublicationSubscriptionPriceUpdated has copy, drop {
     updated_by: address,
 }
 
+public struct PublicationNameUpdated has copy, drop {
+    publication_id: ID,
+    old_name: String,
+    new_name: String,
+    updated_by: address,
+}
+
 public struct SubscriptionBalanceWithdrawn has copy, drop {
     publication_id: ID,
     amount: u64,
@@ -122,13 +129,6 @@ public struct ArticleNftMinted has copy, drop {
 }
 
 public struct PublicationTipped has copy, drop {
-    publication_id: ID,
-    tipper: address,
-    amount: u64,
-}
-
-public struct ArticleTipped has copy, drop {
-    article_id: ID,
     publication_id: ID,
     tipper: address,
     amount: u64,
@@ -214,12 +214,6 @@ public fun emit_publication_tipped(publication_id: ID, tipper: address, amount: 
     sui::event::emit(PublicationTipped { publication_id, tipper, amount });
 }
 
-public fun emit_article_tipped(
-    article_id: ID, publication_id: ID, tipper: address, amount: u64,
-) {
-    sui::event::emit(ArticleTipped { article_id, publication_id, tipper, amount });
-}
-
 public fun emit_publication_subscription_created(
     subscription_id: ID, publication_id: ID, subscriber: address,
     amount_paid: u64, expires_at: u64,
@@ -243,6 +237,14 @@ public fun emit_publication_subscription_price_updated(
 ) {
     sui::event::emit(PublicationSubscriptionPriceUpdated {
         publication_id, old_price, new_price, updated_by,
+    });
+}
+
+public fun emit_publication_name_updated(
+    publication_id: ID, old_name: String, new_name: String, updated_by: address,
+) {
+    sui::event::emit(PublicationNameUpdated {
+        publication_id, old_name, new_name, updated_by,
     });
 }
 

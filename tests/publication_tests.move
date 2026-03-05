@@ -28,16 +28,8 @@ module contracts::publication_tests {
             let publication = test_utils::take_shared<Publication>(&scenario);
             let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
-            // Verify publication properties
-            let name = publication::get_name(&publication);
-            test_utils::assert_eq(name, test_utils::get_test_publication_name());
-
             // Verify owner cap
             test_utils::assert_true(publication::verify_owner_cap(&owner_cap, &publication));
-
-            // Verify contributors list is empty initially
-            let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(vector::length(contributors), 0);
 
             test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
@@ -78,10 +70,6 @@ module contracts::publication_tests {
 
             // Verify contributor was added
             test_utils::assert_publication_has_contributor(&publication, contributor());
-
-            // Verify contributor count
-            let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(vector::length(contributors), 1);
 
             // Verify contributor authorization
             test_utils::assert_true(
@@ -137,10 +125,6 @@ module contracts::publication_tests {
             test_utils::assert_publication_has_contributor(&publication, contributor());
             test_utils::assert_publication_has_contributor(&publication, user1());
 
-            // Verify contributor count
-            let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(vector::length(contributors), 2);
-
             test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
@@ -190,8 +174,6 @@ module contracts::publication_tests {
             );
 
             // Verify contributor was removed
-            let contributors = publication::get_contributors(&publication);
-            test_utils::assert_eq(vector::length(contributors), 0);
             test_utils::assert_false(
                 publication::is_contributor(&publication, contributor())
             );
@@ -426,14 +408,13 @@ module contracts::publication_tests {
             test_utils::return_to_sender(&scenario, owner_cap);
         };
         
-        // Check empty name in shared publication
+        // Verify publication was created (shared object exists)
         test_utils::next_tx(&mut scenario, creator());
         {
             let publication = test_utils::take_shared<Publication>(&scenario);
             let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
 
-            let name = publication::get_name(&publication);
-            assert!(name == string::utf8(b""));
+            test_utils::assert_true(publication::verify_owner_cap(&owner_cap, &publication));
 
             test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
