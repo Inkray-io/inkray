@@ -71,20 +71,6 @@ public struct BlobRenewed has copy, drop {
     renewed_by: address,
 }
 
-public struct SubscriptionMinted has copy, drop {
-    user: address,
-    subscription_id: address,
-    plan: u8,
-    expires_ms: u64,
-}
-
-public struct SubscriptionExtended has copy, drop {
-    user: address,
-    subscription_id: address,
-    old_expires_ms: u64,
-    new_expires_ms: u64,
-}
-
 public struct PublicationSubscriptionCreated has copy, drop {
     subscription_id: ID,
     publication_id: ID,
@@ -192,18 +178,6 @@ public fun emit_blob_renewed(
         publication, vault, blob_id, blob_content_id,
         extended_epochs, new_expiration_epoch, renewed_by,
     });
-}
-
-public fun emit_subscription_minted(
-    user: address, subscription_id: address, plan: u8, expires_ms: u64,
-) {
-    sui::event::emit(SubscriptionMinted { user, subscription_id, plan, expires_ms });
-}
-
-public fun emit_subscription_extended(
-    user: address, subscription_id: address, old_expires_ms: u64, new_expires_ms: u64,
-) {
-    sui::event::emit(SubscriptionExtended { user, subscription_id, old_expires_ms, new_expires_ms });
 }
 
 public fun emit_article_nft_minted(article_id: ID, nft_id: address, to: address, price_paid: u64) {

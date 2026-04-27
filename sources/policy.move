@@ -4,7 +4,6 @@ use contracts::articles::{Self, Article, PostArticleCap};
 use contracts::nft::ArticleAccessNft;
 use contracts::publication::{Self, Publication, PublicationOwnerCap};
 use contracts::publication_subscription::{Self, PublicationSubscription};
-use contracts::subscription::{Self, Subscription};
 use sui::bcs::{Self, BCS};
 use sui::clock::Clock;
 
