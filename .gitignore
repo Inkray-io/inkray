@@ -2,3 +2,4 @@ build/*
 test.js
 .gitignore
 twitter-post.txt
+AUDIT_REPORT.md
