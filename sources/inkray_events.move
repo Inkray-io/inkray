@@ -43,6 +43,16 @@ public struct ArticleDeleted has copy, drop {
     body_blob_id: ID,
 }
 
+public struct ArticleUpdated has copy, drop {
+    publication: ID,
+    article: ID,
+    old_title: String,
+    new_title: String,
+    old_slug: String,
+    new_slug: String,
+    updated_by: address,
+}
+
 public struct BlobStored has copy, drop {
     vault_id: ID,
     publication_id: ID,
@@ -111,7 +121,6 @@ public struct ArticleNftMinted has copy, drop {
     article_id: ID,
     nft_id: address,
     to: address,
-    price_paid: u64,
 }
 
 public struct PublicationTipped has copy, drop {
@@ -122,19 +131,19 @@ public struct PublicationTipped has copy, drop {
 
 // === Emit Functions ===
 
-public fun emit_publication_created(publication: ID, owner: address, name: String, vault_id: ID) {
+public(package) fun emit_publication_created(publication: ID, owner: address, name: String, vault_id: ID) {
     sui::event::emit(PublicationCreated { publication, owner, name, vault_id });
 }
 
-public fun emit_contributor_added(publication: ID, addr: address, added_by: address) {
+public(package) fun emit_contributor_added(publication: ID, addr: address, added_by: address) {
     sui::event::emit(ContributorAdded { publication, addr, added_by });
 }
 
-public fun emit_contributor_removed(publication: ID, addr: address, removed_by: address) {
+public(package) fun emit_contributor_removed(publication: ID, addr: address, removed_by: address) {
     sui::event::emit(ContributorRemoved { publication, addr, removed_by });
 }
 
-public fun emit_article_posted(
+public(package) fun emit_article_posted(
     publication: ID, vault: ID, article: ID, author: address,
     title: String, slug: String, gating: u8, quilt_id: u256, quilt_object_id: ID,
 ) {
@@ -143,7 +152,7 @@ public fun emit_article_posted(
     });
 }
 
-public fun emit_article_deleted(
+public(package) fun emit_article_deleted(
     publication: ID, vault: ID, article: ID, deleted_by: address,
     title: String, slug: String, body_blob_id: ID,
 ) {
@@ -152,7 +161,18 @@ public fun emit_article_deleted(
     });
 }
 
-public fun emit_blob_stored(
+public(package) fun emit_article_updated(
+    publication: ID, article: ID,
+    old_title: String, new_title: String,
+    old_slug: String, new_slug: String,
+    updated_by: address,
+) {
+    sui::event::emit(ArticleUpdated {
+        publication, article, old_title, new_title, old_slug, new_slug, updated_by,
+    });
+}
+
+public(package) fun emit_blob_stored(
     vault_id: ID, publication_id: ID, blob_object_id: ID,
     blob_content_id: u256, size: u64, end_epoch: u64, stored_by: address,
 ) {
@@ -161,7 +181,7 @@ public fun emit_blob_stored(
     });
 }
 
-public fun emit_blob_removed(
+public(package) fun emit_blob_removed(
     vault_id: ID, publication_id: ID, blob_object_id: ID,
     blob_content_id: u256, removed_by: address,
 ) {
@@ -170,7 +190,7 @@ public fun emit_blob_removed(
     });
 }
 
-public fun emit_blob_renewed(
+public(package) fun emit_blob_renewed(
     publication: ID, vault: ID, blob_id: ID, blob_content_id: u256,
     extended_epochs: u32, new_expiration_epoch: u64, renewed_by: address,
 ) {
@@ -180,15 +200,15 @@ public fun emit_blob_renewed(
     });
 }
 
-public fun emit_article_nft_minted(article_id: ID, nft_id: address, to: address, price_paid: u64) {
-    sui::event::emit(ArticleNftMinted { article_id, nft_id, to, price_paid });
+public(package) fun emit_article_nft_minted(article_id: ID, nft_id: address, to: address) {
+    sui::event::emit(ArticleNftMinted { article_id, nft_id, to });
 }
 
-public fun emit_publication_tipped(publication_id: ID, tipper: address, amount: u64) {
+public(package) fun emit_publication_tipped(publication_id: ID, tipper: address, amount: u64) {
     sui::event::emit(PublicationTipped { publication_id, tipper, amount });
 }
 
-public fun emit_publication_subscription_created(
+public(package) fun emit_publication_subscription_created(
     subscription_id: ID, publication_id: ID, subscriber: address,
     amount_paid: u64, expires_at: u64,
 ) {
@@ -197,7 +217,7 @@ public fun emit_publication_subscription_created(
     });
 }
 
-public fun emit_publication_subscription_extended(
+public(package) fun emit_publication_subscription_extended(
     subscription_id: ID, publication_id: ID, subscriber: address,
     amount_paid: u64, new_expires_at: u64,
 ) {
@@ -206,7 +226,7 @@ public fun emit_publication_subscription_extended(
     });
 }
 
-public fun emit_publication_subscription_price_updated(
+public(package) fun emit_publication_subscription_price_updated(
     publication_id: ID, old_price: u64, new_price: u64, updated_by: address,
 ) {
     sui::event::emit(PublicationSubscriptionPriceUpdated {
@@ -214,7 +234,7 @@ public fun emit_publication_subscription_price_updated(
     });
 }
 
-public fun emit_publication_name_updated(
+public(package) fun emit_publication_name_updated(
     publication_id: ID, old_name: String, new_name: String, updated_by: address,
 ) {
     sui::event::emit(PublicationNameUpdated {
@@ -222,7 +242,7 @@ public fun emit_publication_name_updated(
     });
 }
 
-public fun emit_subscription_balance_withdrawn(
+public(package) fun emit_subscription_balance_withdrawn(
     publication_id: ID, amount: u64, withdrawn_by: address,
 ) {
     sui::event::emit(SubscriptionBalanceWithdrawn { publication_id, amount, withdrawn_by });

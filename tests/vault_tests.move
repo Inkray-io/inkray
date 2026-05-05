@@ -10,13 +10,15 @@ module contracts::vault_tests {
 
     fun setup_publication_and_vault(user: address): (test_scenario::Scenario, address) {
         let mut scenario = test_utils::begin_scenario(user);
-        
+
+        test_utils::setup_global_config(&mut scenario, test_utils::admin());
+
         test_utils::next_tx(&mut scenario, user);
-        let owner_cap = publication::create(
+        let owner_cap = test_utils::publication_create_with_config(
+            &mut scenario,
             test_utils::get_test_publication_name(),
-            test_scenario::ctx(&mut scenario)
         );
-        
+
         test_utils::return_to_sender(&scenario, owner_cap);
         (scenario, @0x0)
     }
@@ -183,7 +185,7 @@ module contracts::vault_tests {
             let owner_cap = test_utils::take_from_sender<publication::PublicationOwnerCap>(&scenario);
             let mut publication = test_utils::take_shared<Publication>(&scenario);
             
-            publication::add_contributor(&owner_cap, &mut publication, test_utils::contributor(), test_scenario::ctx(&mut scenario));
+            test_utils::publication_add_contributor_with_config(&mut scenario, &owner_cap, &mut publication, test_utils::contributor());
             
             test_utils::return_to_sender(&scenario, owner_cap);
             test_utils::return_shared(publication);
@@ -266,20 +268,22 @@ module contracts::vault_tests {
     #[test]
     fun test_multiple_publications_have_different_vault_addresses() {
         let mut scenario = test_utils::begin_scenario(test_utils::creator());
-        
+
+        test_utils::setup_global_config(&mut scenario, test_utils::admin());
+
         // Create first publication by creator
         test_utils::next_tx(&mut scenario, test_utils::creator());
-        let owner_cap1 = publication::create(
+        let owner_cap1 = test_utils::publication_create_with_config(
+            &mut scenario,
             string::utf8(b"Publication 1"),
-            test_scenario::ctx(&mut scenario)
         );
         test_utils::return_to_sender(&scenario, owner_cap1);
-        
+
         // Create second publication by contributor (different user)
         test_utils::next_tx(&mut scenario, test_utils::contributor());
-        let owner_cap2 = publication::create(
+        let owner_cap2 = test_utils::publication_create_with_config(
+            &mut scenario,
             string::utf8(b"Publication 2"),
-            test_scenario::ctx(&mut scenario)
         );
         test_utils::return_to_sender(&scenario, owner_cap2);
         

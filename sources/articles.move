@@ -1,15 +1,16 @@
 module contracts::articles;
 
+use contracts::config::{Self, GlobalConfig};
 use contracts::inkray_events;
 use contracts::publication::{Self, Publication, PublicationOwnerCap};
 use contracts::vault::{Self, Access, PublicationVault};
 use std::string::{Self, String};
 
-const E_NOT_AUTHORIZED: u64 = 0;
-const E_INVALID_PUBLICATION: u64 = 1;
-const E_INVALID_VAULT: u64 = 2;
-const E_ARTICLE_NOT_FROM_PUBLICATION: u64 = 3;
-const E_VAULT_MISMATCH: u64 = 4;
+const E_NOT_AUTHORIZED: u64 = 201;
+const E_INVALID_PUBLICATION: u64 = 202;
+const E_INVALID_VAULT: u64 = 203;
+const E_ARTICLE_NOT_FROM_PUBLICATION: u64 = 204;
+const E_VAULT_MISMATCH: u64 = 205;
 
 public struct Article has key, store {
     id: UID,
@@ -22,7 +23,7 @@ public struct Article has key, store {
     author: address,
 }
 
-public struct PostArticleCap has key, store {
+public struct PostArticleCap has key {
     id: UID,
 }
 
@@ -31,7 +32,26 @@ fun init(ctx: &mut TxContext) {
     transfer::transfer(post_cap, tx_context::sender(ctx));
 }
 
+public fun transfer_post_article_cap(cap: PostArticleCap, recipient: address) {
+    transfer::transfer(cap, recipient);
+}
+
+public fun issue_additional_post_article_cap(
+    _cap: &PostArticleCap,
+    recipient: address,
+    ctx: &mut TxContext,
+) {
+    let new_cap = PostArticleCap { id: object::new(ctx) };
+    transfer::transfer(new_cap, recipient);
+}
+
+public fun destroy_post_article_cap(cap: PostArticleCap) {
+    let PostArticleCap { id } = cap;
+    object::delete(id);
+}
+
 public fun post_with_cap(
+    config: &GlobalConfig,
     _cap: &PostArticleCap,
     publication: &Publication,
     vault: &mut PublicationVault,
@@ -41,6 +61,7 @@ public fun post_with_cap(
     author: address,
     ctx: &mut TxContext,
 ): Article {
+    config::assert_version(config);
     post_internal(publication, vault, title, gating, body_blob, author, ctx)
 }
 
@@ -78,23 +99,34 @@ fun post_internal(
 }
 
 public fun update_article(
+    config: &GlobalConfig,
     owner_cap: &PublicationOwnerCap,
     publication: &Publication,
     article: &mut Article,
     new_title: String,
-    _ctx: &TxContext,
+    ctx: &TxContext,
 ) {
+    config::assert_version(config);
     assert!(publication::verify_owner_cap(owner_cap, publication), E_NOT_AUTHORIZED);
     assert!(
         article.publication_id == publication::get_publication_object_id(publication),
         E_INVALID_PUBLICATION,
     );
     assert!(article.vault_id == publication::get_vault_id(publication), E_INVALID_VAULT);
+    let old_title = article.title;
+    let old_slug = article.slug;
+    let new_slug = generate_slug_from_title(new_title, &article.id);
     article.title = new_title;
-    article.slug = generate_slug_from_title(new_title, &article.id);
+    article.slug = new_slug;
+    inkray_events::emit_article_updated(
+        article.publication_id, article.id.to_inner(),
+        old_title, new_title, old_slug, new_slug,
+        tx_context::sender(ctx),
+    );
 }
 
 public fun delete_article(
+    config: &GlobalConfig,
     owner_cap: &PublicationOwnerCap,
     publication: &Publication,
     vault: &mut PublicationVault,
@@ -102,6 +134,7 @@ public fun delete_article(
     system: &mut walrus::system::System,
     ctx: &mut TxContext,
 ) {
+    config::assert_version(config);
     assert!(publication::verify_owner_cap(owner_cap, publication), E_NOT_AUTHORIZED);
     assert!(
         article.publication_id == publication::get_publication_object_id(publication),
@@ -152,7 +185,7 @@ public fun generate_slug_from_title(title: String, article_uid: &UID): String {
     if (vector::length(&result) > 0) { vector::push_back(&mut result, 45); };
     let uid_bytes = object::uid_to_bytes(article_uid);
     let mut j = 0;
-    while (j < 4 && j < vector::length(&uid_bytes)) {
+    while (j < 8 && j < vector::length(&uid_bytes)) {
         let b = *vector::borrow(&uid_bytes, j);
         vector::push_back(&mut result, if (b / 16 < 10) { 48 + b / 16 } else { 87 + b / 16 });
         vector::push_back(&mut result, if (b % 16 < 10) { 48 + b % 16 } else { 87 + b % 16 });
@@ -167,6 +200,10 @@ fun access_to_u8(access: &Access): u8 {
 
 public fun get_article_id(article: &Article): ID {
     article.id.to_inner()
+}
+
+public fun publication_id(article: &Article): ID {
+    article.publication_id
 }
 
 public fun is_free_content(article: &Article): bool {

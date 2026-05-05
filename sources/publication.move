@@ -1,12 +1,18 @@
 module contracts::publication;
 
+use contracts::config::{Self, GlobalConfig};
 use contracts::inkray_events;
 use contracts::vault;
 use std::string::String;
 
-const E_NOT_OWNER: u64 = 0;
-const E_CONTRIBUTOR_NOT_FOUND: u64 = 1;
-const E_CONTRIBUTOR_EXISTS: u64 = 2;
+const E_NOT_OWNER: u64 = 101;
+const E_CONTRIBUTOR_NOT_FOUND: u64 = 102;
+const E_CONTRIBUTOR_EXISTS: u64 = 103;
+const E_TOO_MANY_CONTRIBUTORS: u64 = 104;
+const E_PRICE_TOO_LOW: u64 = 105;
+
+const MAX_CONTRIBUTORS: u64 = 1000;
+const MIN_SUBSCRIPTION_PRICE: u64 = 10_000_000;
 
 public struct Publication has key, store {
     id: UID,
@@ -25,7 +31,12 @@ public struct PublicationOwnerCap has key, store {
     publication_id: ID,
 }
 
-public fun create(name: String, ctx: &mut TxContext): PublicationOwnerCap {
+public fun create(
+    config: &GlobalConfig,
+    name: String,
+    ctx: &mut TxContext,
+): PublicationOwnerCap {
+    config::assert_version(config);
     let owner = tx_context::sender(ctx);
     let publication_uid = object::new(ctx);
     let publication_id = publication_uid.to_inner();
@@ -56,13 +67,19 @@ public fun create(name: String, ctx: &mut TxContext): PublicationOwnerCap {
 }
 
 public fun add_contributor(
+    config: &GlobalConfig,
     owner_cap: &PublicationOwnerCap,
     publication: &mut Publication,
     contributor: address,
     ctx: &TxContext,
 ) {
+    config::assert_version(config);
     assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
     assert!(!vector::contains(&publication.contributors, &contributor), E_CONTRIBUTOR_EXISTS);
+    assert!(
+        vector::length(&publication.contributors) < MAX_CONTRIBUTORS,
+        E_TOO_MANY_CONTRIBUTORS,
+    );
     vector::push_back(&mut publication.contributors, contributor);
     inkray_events::emit_contributor_added(
         publication.id.to_inner(), contributor, tx_context::sender(ctx),
@@ -70,11 +87,13 @@ public fun add_contributor(
 }
 
 public fun remove_contributor(
+    config: &GlobalConfig,
     owner_cap: &PublicationOwnerCap,
     publication: &mut Publication,
     contributor: address,
     ctx: &TxContext,
 ) {
+    config::assert_version(config);
     assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
     let (found, index) = vector::index_of(&publication.contributors, &contributor);
     assert!(found, E_CONTRIBUTOR_NOT_FOUND);
@@ -164,11 +183,13 @@ public fun requires_subscription(publication: &Publication): bool {
 }
 
 public fun update_name(
+    config: &GlobalConfig,
     owner_cap: &PublicationOwnerCap,
     publication: &mut Publication,
     new_name: String,
     ctx: &TxContext,
 ) {
+    config::assert_version(config);
     assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
     let old_name = publication.name;
     publication.name = new_name;
@@ -178,12 +199,15 @@ public fun update_name(
 }
 
 public fun set_subscription_price(
+    config: &GlobalConfig,
     owner_cap: &PublicationOwnerCap,
     publication: &mut Publication,
     price: u64,
     ctx: &TxContext,
 ) {
+    config::assert_version(config);
     assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
+    assert!(price == 0 || price >= MIN_SUBSCRIPTION_PRICE, E_PRICE_TOO_LOW);
     let old_price = publication.subscription_price;
     publication.subscription_price = price;
     inkray_events::emit_publication_subscription_price_updated(
@@ -199,11 +223,13 @@ public(package) fun add_subscription_balance(
 }
 
 public fun withdraw_subscription_balance(
+    config: &GlobalConfig,
     owner_cap: &PublicationOwnerCap,
     publication: &mut Publication,
     amount: u64,
     ctx: &mut TxContext,
 ): sui::coin::Coin<sui::sui::SUI> {
+    config::assert_version(config);
     assert!(owner_cap.publication_id == publication.id.to_inner(), E_NOT_OWNER);
     let withdrawn_balance = sui::balance::split(&mut publication.subscription_balance, amount);
     inkray_events::emit_subscription_balance_withdrawn(

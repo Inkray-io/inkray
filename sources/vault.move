@@ -18,9 +18,9 @@ public struct PublicationVault has key, store {
     publication_id: ID,
 }
 
-const E_ASSET_NOT_FOUND: u64 = 0;
-const E_ASSET_EXISTS: u64 = 1;
-const E_INVALID_EPOCH_EXTENSION: u64 = 2;
+const E_ASSET_NOT_FOUND: u64 = 301;
+const E_ASSET_EXISTS: u64 = 302;
+const E_INVALID_EPOCH_EXTENSION: u64 = 303;
 
 fun init(_ctx: &mut TxContext) {}
 

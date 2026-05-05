@@ -12,32 +12,34 @@ module contracts::articles_tests {
         contributor: address
     ): (test_scenario::Scenario, address) {
         let mut scenario = test_utils::begin_scenario(owner);
-        
+
+        test_utils::setup_global_config(&mut scenario, test_utils::admin());
+
         // Create publication
         test_utils::next_tx(&mut scenario, owner);
-        let owner_cap = publication::create(
+        let owner_cap = test_utils::publication_create_with_config(
+            &mut scenario,
             test_utils::get_test_publication_name(),
-            test_scenario::ctx(&mut scenario)
         );
         test_utils::return_to_sender(&scenario, owner_cap);
-        
+
         // Add contributor
         test_utils::next_tx(&mut scenario, owner);
         {
             let mut publication = test_utils::take_shared<Publication>(&scenario);
             let owner_cap = test_utils::take_from_sender<PublicationOwnerCap>(&scenario);
-            
-            publication::add_contributor(
+
+            test_utils::publication_add_contributor_with_config(
+                &mut scenario,
                 &owner_cap,
                 &mut publication,
                 contributor,
-                test_scenario::ctx(&mut scenario)
             );
-            
+
             test_utils::return_shared(publication);
             test_utils::return_to_sender(&scenario, owner_cap);
         };
-        
+
         (scenario, @0x0)
     }
 
@@ -254,11 +256,11 @@ module contracts::articles_tests {
             assert!(publication::is_contributor(&publication, test_utils::contributor()), 0);
             
             // 4. Owner can add themselves as contributor for dual access
-            publication::add_contributor(
+            test_utils::publication_add_contributor_with_config(
+                &mut scenario,
                 &owner_cap,
                 &mut publication,
                 test_utils::creator(),
-                test_scenario::ctx(&mut scenario)
             );
             
             // 5. Now creator has both capability AND contributor access

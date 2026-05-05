@@ -164,17 +164,78 @@ module contracts::inkray_test_utils {
 
     // === Publication Setup Helpers ===
     
+    public fun setup_global_config(scenario: &mut Scenario, admin: address) {
+        next_tx(scenario, admin);
+        contracts::config::init_for_testing(test_scenario::ctx(scenario));
+    }
+
+    /// Helper used by tests to create a publication. Encapsulates the
+    /// take_shared<GlobalConfig> / return_shared boilerplate.
+    public fun publication_create_with_config(
+        scenario: &mut Scenario,
+        name: std::string::String,
+    ): contracts::publication::PublicationOwnerCap {
+        let config = test_scenario::take_shared<contracts::config::GlobalConfig>(scenario);
+        let owner_cap = contracts::publication::create(
+            &config,
+            name,
+            test_scenario::ctx(scenario),
+        );
+        test_scenario::return_shared(config);
+        owner_cap
+    }
+
+    public fun publication_add_contributor_with_config(
+        scenario: &mut Scenario,
+        owner_cap: &contracts::publication::PublicationOwnerCap,
+        publication: &mut contracts::publication::Publication,
+        addr: address,
+    ) {
+        let config = test_scenario::take_shared<contracts::config::GlobalConfig>(scenario);
+        contracts::publication::add_contributor(
+            &config,
+            owner_cap,
+            publication,
+            addr,
+            test_scenario::ctx(scenario),
+        );
+        test_scenario::return_shared(config);
+    }
+
+    public fun publication_remove_contributor_with_config(
+        scenario: &mut Scenario,
+        owner_cap: &contracts::publication::PublicationOwnerCap,
+        publication: &mut contracts::publication::Publication,
+        addr: address,
+    ) {
+        let config = test_scenario::take_shared<contracts::config::GlobalConfig>(scenario);
+        contracts::publication::remove_contributor(
+            &config,
+            owner_cap,
+            publication,
+            addr,
+            test_scenario::ctx(scenario),
+        );
+        test_scenario::return_shared(config);
+    }
+
     public fun standard_publication_setup(scenario: &mut Scenario) {
         use contracts::publication;
+        use contracts::config::GlobalConfig;
+
+        setup_global_config(scenario, admin());
 
         next_tx(scenario, creator());
         {
+            let config = test_scenario::take_shared<GlobalConfig>(scenario);
             // Create publication with vault (new API)
             let owner_cap = publication::create(
+                &config,
                 get_test_publication_name(),
                 test_scenario::ctx(scenario)
             );
 
+            test_scenario::return_shared(config);
             return_to_sender(scenario, owner_cap);
         };
     }
