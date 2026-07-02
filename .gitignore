@@ -1,5 +1,20 @@
-build/*
+# Move build output
+build/
+
+# OS / editor
+.DS_Store
+.claude/
+
+# Secrets & local env
+.env
+.env.*
+*.key
+
+# Backups / scratch
+*.bak
 test.js
-.gitignore
 twitter-post.txt
 AUDIT_REPORT.md
+
+# Dependencies
+node_modules/
