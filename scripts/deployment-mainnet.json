@@ -1,0 +1,22 @@
+{
+  "network": "mainnet",
+  "deployedAt": "2026-06-16",
+  "digest": "CKpgs7RQLcqeqnDfE23JBLWbAo5C9ZcdtAo9a1ejCJe8",
+  "deployer": "0x0fd92a6ac37e37c0103d1e0157abf5041f893d3b2588b5647f3bd61714ccf3cb",
+  "packageId": "0x02c666682f782b481fd05adfdfd4282acda8f8afb589ee62edc7882073d553e5",
+  "sharedObjects": {
+    "GlobalConfig": "0x092a5cea6b68c4c83f25a24b14943297d3fcfda54b6d848f89691a097063ae5e",
+    "MintRegistry": "0x83f03183b7428e7d2fdf68c748ec4c0f324587b23750f9ecb350d6abe0e70645",
+    "ArticleNftDisplay": "0x805af626333e8725b3b339ffb51cf762ea834c15244de6f2e28562cc086f0fd6"
+  },
+  "ownedCaps": {
+    "AdminCap": "0x52304564e71a007f01be9aae6d599379809a6ff53b9990c60d00e1d6b5d52a2a",
+    "PostArticleCap": "0x79c0915a62ed8298c0c734de2314396e087dad4f195973ea7c0e7591bc975284",
+    "UpgradeCap": "0x584f6c70df5d4a5f2b3b498e51f2340226d2baef9dfc40f2c38bffffa8220a5e",
+    "Publisher": "0x61c04315319a9d19753d1ca0f99af18cf5e8ed3ffdb43d5d9021365a0e4ab584"
+  },
+  "walrusMainnet": {
+    "walrusPackage": "0xfdc88f7d7cf30afab2f82e8380d11ee8f70efb90e863d1de8616fae1bb09ea77",
+    "walPackage": "0x356a26eb9e012a68958082340d4c4116e7f55615cf27affcff209cf0ae544f59"
+  }
+}

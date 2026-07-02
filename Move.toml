@@ -1,16 +1,10 @@
 [package]
 name = "contracts"
 edition = "2024.beta"
-license = "MIT"
+license = "Apache-2.0"
 authors = ["Inkray Team"]
 
 [dependencies]
-# Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.54.0", override = true }
-Walrus = { git = "https://github.com/MystenLabs/walrus.git", subdir = "testnet-contracts/walrus", rev = "testnet" } # example; pin to the latest testnet tag
-
-[addresses]
-contracts = "0x0"
-
-[dev-dependencies]
-
-[dev-addresses]
+# Mainnet Walrus contracts (pulls mainnet WAL transitively). Sui framework resolves from the active mainnet env.
+walrus = { git = "https://github.com/MystenLabs/walrus.git", subdir = "mainnet-contracts/walrus", rev = "mainnet" }
+wal = { git = "https://github.com/MystenLabs/walrus.git", subdir = "mainnet-contracts/wal", rev = "mainnet" }
